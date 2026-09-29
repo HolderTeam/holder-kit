@@ -7,13 +7,12 @@ from datetime import datetime, timezone
 from typing import Any, Mapping, TypedDict
 
 
-class CardRecord(TypedDict):
-    """Serializable card metadata plus its separately retrieved body."""
+class CardMetadataRecord(TypedDict):
+    """Serializable live-card metadata without its body."""
 
     card_id: str
     project_id: str
     title: str
-    content: str
     rel_path: str
     parent_card_id: str | None
     sort_key: float
@@ -22,7 +21,25 @@ class CardRecord(TypedDict):
     deleted_at: int | None
 
 
-CARD_RECORD_FIELDS: tuple[str, ...] = (
+class CompleteCardRecord(CardMetadataRecord):
+    """Serializable live-card metadata and its authoritative Markdown body."""
+
+    content: str
+
+
+CARD_METADATA_RECORD_FIELDS: tuple[str, ...] = (
+    "card_id",
+    "project_id",
+    "title",
+    "rel_path",
+    "parent_card_id",
+    "sort_key",
+    "created_at",
+    "updated_at",
+    "deleted_at",
+)
+
+COMPLETE_CARD_RECORD_FIELDS: tuple[str, ...] = (
     "card_id",
     "project_id",
     "title",
@@ -35,6 +52,11 @@ CARD_RECORD_FIELDS: tuple[str, ...] = (
     "deleted_at",
 )
 
+# Increment 2 called the complete-body contract CardRecord. Preserve that public
+# spelling while giving metadata-only and complete exports distinct precise names.
+CardRecord = CompleteCardRecord
+CARD_RECORD_FIELDS = COMPLETE_CARD_RECORD_FIELDS
+
 
 def _optional_string(value: object) -> str | None:
     return None if value is None else str(value)
@@ -42,6 +64,36 @@ def _optional_string(value: object) -> str | None:
 
 def _optional_int(value: Any) -> int | None:
     return None if value is None else int(value)
+
+
+def _metadata_record_from_native(record: Mapping[str, Any]) -> CardMetadataRecord:
+    return {
+        "card_id": str(record["card_id"]),
+        "project_id": str(record["project_id"]),
+        "title": str(record["title"]),
+        "rel_path": str(record["rel_path"]),
+        "parent_card_id": _optional_string(record["parent_card_id"]),
+        "sort_key": float(record["sort_key"]),
+        "created_at": int(record["created_at"]),
+        "updated_at": int(record["updated_at"]),
+        "deleted_at": _optional_int(record["deleted_at"]),
+    }
+
+
+def _complete_record_from_native(record: Mapping[str, Any]) -> CompleteCardRecord:
+    metadata = _metadata_record_from_native(record)
+    return {
+        "card_id": metadata["card_id"],
+        "project_id": metadata["project_id"],
+        "title": metadata["title"],
+        "content": str(record["content"]),
+        "rel_path": metadata["rel_path"],
+        "parent_card_id": metadata["parent_card_id"],
+        "sort_key": metadata["sort_key"],
+        "created_at": metadata["created_at"],
+        "updated_at": metadata["updated_at"],
+        "deleted_at": metadata["deleted_at"],
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +140,7 @@ class Card:
             return None
         return datetime.fromtimestamp(self.deleted_at, tz=timezone.utc)
 
-    def to_record(self) -> CardRecord:
+    def to_record(self) -> CompleteCardRecord:
         return {
             "card_id": self.card_id,
             "project_id": self.project_id,
@@ -103,4 +155,12 @@ class Card:
         }
 
 
-__all__ = ["CARD_RECORD_FIELDS", "Card", "CardRecord"]
+__all__ = [
+    "CARD_METADATA_RECORD_FIELDS",
+    "CARD_RECORD_FIELDS",
+    "COMPLETE_CARD_RECORD_FIELDS",
+    "Card",
+    "CardMetadataRecord",
+    "CardRecord",
+    "CompleteCardRecord",
+]

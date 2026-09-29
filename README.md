@@ -65,16 +65,21 @@ with Context("/path/to/isolated/data") as context:
     project = context.create_project("Notes")
     card = context.create_card(project.project_id, "A card", "Body")
     context.update_card(card.card_id, "New body", "New title")
-    records = context.cards.to_records(project.project_id)
+    metadata = context.cards.to_records(project.project_id)
+    records = context.cards.to_records(
+        project.project_id, include_content=True
+    )
 
 # Detached records remain usable after the context has closed.
 print(records[0]["content"])
 ```
 
 `Project` and `Card` are frozen, slotted dataclasses. `to_records()` returns
-plain typed dictionaries containing only standard-library values. Their stable
-schemas, null and timestamp conventions, extraction behavior, and current bulk
-read limitations are documented in
+cheap metadata-only `CardMetadataRecord` dictionaries by default;
+`include_content=True` returns `CompleteCardRecord` dictionaries using
+libholder's paginated authoritative-file operation. All records contain only
+standard-library values. Their stable schemas, null and timestamp conventions,
+and extraction consistency are documented in
 [Detached record contracts](docs/record-contracts.md).
 
 A `Context` owns its native `holder_context` and can be closed explicitly or

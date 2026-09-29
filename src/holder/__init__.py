@@ -8,10 +8,14 @@ from importlib.resources import files
 from . import _native
 from .collections import CardCollection, ProjectCollection
 from .data import (
+    CARD_METADATA_RECORD_FIELDS,
     CARD_RECORD_FIELDS,
+    COMPLETE_CARD_RECORD_FIELDS,
     PROJECT_RECORD_FIELDS,
     Card,
+    CardMetadataRecord,
     CardRecord,
+    CompleteCardRecord,
     Project,
     ProjectRecord,
 )
@@ -86,11 +90,15 @@ class Context:
 
 
 __all__ = [
+    "CARD_METADATA_RECORD_FIELDS",
     "CARD_RECORD_FIELDS",
+    "COMPLETE_CARD_RECORD_FIELDS",
     "PROJECT_RECORD_FIELDS",
     "Card",
     "CardCollection",
+    "CardMetadataRecord",
     "CardRecord",
+    "CompleteCardRecord",
     "Context",
     "HolderError",
     "Project",

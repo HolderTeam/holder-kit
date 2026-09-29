@@ -9,7 +9,8 @@ Identifiers are opaque strings. Timestamps are integer Unix seconds exactly as
 reported by libholder; the typed models additionally expose timezone-aware UTC
 `datetime` properties. Nullable native fields are always present and use
 `None`. Empty exports are ordinary empty lists; `PROJECT_RECORD_FIELDS` and
-`CARD_RECORD_FIELDS` describe their schema without requiring a sample row.
+the corresponding `*_RECORD_FIELDS` constants describe their schema without
+requiring a sample row.
 
 ## `ProjectRecord`
 
@@ -26,14 +27,13 @@ reported by libholder; the typed models additionally expose timezone-aware UTC
 | `git_provider` | `str \| None` | Configured Git provider |
 | `project_key_id` | `str \| None` | Encrypted-project key identifier |
 
-## `CardRecord`
+## `CardMetadataRecord`
 
 | Field | Python type | Meaning |
 |---|---|---|
 | `card_id` | `str` | Stable card identifier |
 | `project_id` | `str` | Owning project identifier |
 | `title` | `str` | Card title |
-| `content` | `str` | Markdown body |
 | `rel_path` | `str` | Card path relative to its project root |
 | `parent_card_id` | `str \| None` | Parent card identifier |
 | `sort_key` | `float` | Sibling ordering key |
@@ -41,29 +41,40 @@ reported by libholder; the typed models additionally expose timezone-aware UTC
 | `updated_at` | `int` | Last update time as Unix seconds |
 | `deleted_at` | `int \| None` | Soft-deletion time; live exports use `None` |
 
+This inexpensive contract is returned by `cards.to_records()`. It comes from
+`holder_card_list` and does not open or decrypt card files.
+
+## `CompleteCardRecord`
+
+`CompleteCardRecord` contains every `CardMetadataRecord` field plus:
+
+| Field | Python type | Meaning |
+|---|---|---|
+| `content` | `str` | Markdown body read from the authoritative card file |
+
+It is returned by `cards.to_records(include_content=True)`. The earlier
+`CardRecord` name remains an alias of this complete contract, and
+`CARD_RECORD_FIELDS` remains an alias of `COMPLETE_CARD_RECORD_FIELDS`.
+
 `CardCollection` currently exports live cards. Tags, connections, milestones,
 and trashed cards are separate future record contracts rather than nested
-columns in `CardRecord`.
+columns in either card record contract.
 
 ## Extraction behavior and limitations
 
-`holder_project_list` provides project metadata in one call.
-`holder_card_list` provides card metadata for one project, but it does not
-include body content. Consequently, complete card extraction currently uses:
+Metadata-only extraction calls `holder_card_list` once per selected project.
+Complete extraction uses `holder_card_list_complete_page` and follows its
+opaque cursor until exhausted, avoiding one native operation per card. Each
+page is ordered by `card_id`, contains live cards only, and reads bodies from
+their authoritative durable files rather than the disposable FTS index.
 
-1. one project-list call for a cross-project export;
-2. one card-list call for each project; and
-3. one `holder_card_get_content` call for each card.
+Metadata selection and body reads within one complete page share libholder's
+process-local project operation lock. Supported operations through the same
+process therefore cannot interleave inside that page. There is deliberately no
+snapshot promise across pages or projects, and the lock cannot coordinate with
+another process or direct filesystem/database edits. A missing card file, or a
+read, decryption, or parsing failure, fails the whole page rather than emitting
+an empty substitute body.
 
-This is correct but creates an N+1 content-read pattern that may matter for
-large pandas or ML exports. The public C API's backup snapshot endpoint can
-page bodies together with links and milestones, but it is backup-specific and
-does not carry all normal card metadata (`rel_path`, hierarchy, ordering, tags,
-or deleted state). It is therefore not used as an undocumented general-purpose
-query.
-
-Exports are detached snapshots, but the current C API does not provide a
-single transactional bulk read spanning project metadata, cards, and content.
-Concurrent writes may therefore be observed between calls. A future core API
-for paginated, complete card records would remove the N+1 reads and define
-snapshot consistency explicitly.
+All returned dictionaries are detached snapshots: they hold copied Python
+values and remain usable after their originating context closes.
