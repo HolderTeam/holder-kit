@@ -5,8 +5,8 @@ from __future__ import annotations
 import builtins
 
 from . import _native
-from .models import Card, Project
-from .records import CardRecord, ProjectRecord
+from .data.card import Card, CardRecord
+from .data.project import Project, ProjectRecord
 
 
 class ProjectCollection:

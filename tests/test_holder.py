@@ -10,11 +10,22 @@ import pytest
 
 import holder
 from holder import _native
+from holder.data.card import Card as DomainCard
+from holder.data.card import CardRecord as DomainCardRecord
+from holder.data.project import Project as DomainProject
+from holder.data.project import ProjectRecord as DomainProjectRecord
 
 
 def test_native_extension_imports() -> None:
     assert _native.__name__ == "holder._native"
     assert issubclass(holder.HolderError, RuntimeError)
+
+
+def test_domain_data_types_are_reexported() -> None:
+    assert holder.Card is DomainCard
+    assert holder.CardRecord is DomainCardRecord
+    assert holder.Project is DomainProject
+    assert holder.ProjectRecord is DomainProjectRecord
 
 
 def test_complete_card_lifecycle(tmp_path: Path) -> None:

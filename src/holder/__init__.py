@@ -7,11 +7,12 @@ from importlib.resources import files
 
 from . import _native
 from .collections import CardCollection, ProjectCollection
-from .models import Card, Project
-from .records import (
+from .data import (
     CARD_RECORD_FIELDS,
     PROJECT_RECORD_FIELDS,
+    Card,
     CardRecord,
+    Project,
     ProjectRecord,
 )
 
