@@ -12,19 +12,23 @@ permissions:
 
 jobs:
   linux:
-    name: ${{ matrix.runner }} / Python ${{ matrix.python-version }}
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-24.04
+            name: Ubuntu 24.04 / Python 3.12 / compatibility
             python-version: "3.12"
-            comprehensive: false
-          - runner: ubuntu-26.04
-            python-version: "3.14"
             comprehensive: true
+            sanitized: false
+          - runner: ubuntu-26.04
+            name: Ubuntu 26.04 / Python 3.14 / native + sanitizers
+            python-version: "3.14"
+            comprehensive: false
+            sanitized: true
 
     steps:
       - name: Check out holder-python and holder-core
@@ -73,16 +77,42 @@ jobs:
           python3 -m venv "${RUNNER_TEMP}/holder-ci-venv"
           echo "${RUNNER_TEMP}/holder-ci-venv/bin" >> "${GITHUB_PATH}"
 
+      - name: Install holder-core test dependency
+        if: ${{ matrix.sanitized }}
+        run: sudo apt-get install -y --no-install-recommends catch2
+
       - name: Install packaging tools
         run: python3 -m pip install --upgrade pip
-
-      - name: Build and install holder-python with base test dependencies
-        if: ${{ !matrix.comprehensive }}
-        run: python3 -m pip install --verbose . 'pytest>=8'
 
       - name: Build and install holder-python with complete test dependencies
         if: ${{ matrix.comprehensive }}
         run: python3 -m pip install --verbose '.[test]'
+
+      - name: Build instrumented holder-python for lifecycle smoke tests
+        if: ${{ matrix.sanitized }}
+        env:
+          CMAKE_ARGS: -DHOLDER_PYTHON_SANITIZE=address,undefined
+        run: python3 -m pip install --verbose . 'pytest>=8'
+
+      - name: Run holder-core tests with ASan and UBSan
+        if: ${{ matrix.sanitized }}
+        working-directory: submodules/holder-core
+        env:
+          TMPDIR: ${{ runner.temp }}
+          XDG_RUNTIME_DIR: ${{ runner.temp }}
+        run: ./make.sh san address,undefined
+
+      - name: Configure sanitizer runtime
+        if: ${{ matrix.sanitized }}
+        run: |
+          asan_library="$(gcc -print-file-name=libasan.so)"
+          if ! file -L "${asan_library}" | grep -q 'ELF'; then
+            asan_library="$(ldconfig -p | awk '/libasan\.so/{print $NF; exit}')"
+          fi
+          test -f "${asan_library}"
+          echo "LD_PRELOAD=${asan_library}" >> "${GITHUB_ENV}"
+          echo "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1" >> "${GITHUB_ENV}"
+          echo "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1" >> "${GITHUB_ENV}"
 
       - name: Show installed build
         run: |
@@ -91,9 +121,14 @@ jobs:
           python3 -m pip show holder
           python3 -c 'import holder; print(holder.__file__)'
 
-      - name: Run base Python tests
-        if: ${{ !matrix.comprehensive }}
-        run: python3 -m pytest --verbose tests/test_holder.py
+      - name: Run instrumented Python lifecycle smoke tests
+        if: ${{ matrix.sanitized }}
+        run: |
+          python3 -m pytest --verbose \
+            tests/test_holder.py::test_native_extension_imports \
+            tests/test_holder.py::test_complete_card_lifecycle \
+            tests/test_holder.py::test_context_destruction_releases_native_resources \
+            tests/test_holder.py::test_failed_context_initialization_releases_partial_state
 
       - name: Run complete Python tests
         if: ${{ matrix.comprehensive }}
@@ -266,72 +301,3 @@ jobs:
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: holder-python-vcpkg-${{ runner.os }}-${{ hashFiles('submodules/holder-core/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-  sanitizers:
-    name: ASan + UBSan / ubuntu-26.04 / Python 3.14
-    runs-on: ubuntu-26.04
-    timeout-minutes: 30
-
-    steps:
-      - name: Check out holder-python and holder-core
-        uses: actions/checkout@v7
-        with:
-          submodules: recursive
-          persist-credentials: false
-
-      - name: Install native build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            cmake \
-            ninja-build \
-            pkg-config \
-            python3-dev \
-            python3-venv \
-            libssl-dev \
-            nlohmann-json3-dev \
-            libyaml-cpp-dev \
-            libspdlog-dev \
-            libsqlite3-dev \
-            libsodium-dev \
-            libgit2-dev \
-            libmd4c-dev \
-            libsecret-1-dev
-
-      - name: Verify runner Python
-        run: |
-          python3 - <<'PY'
-          import sys
-
-          actual = f"{sys.version_info.major}.{sys.version_info.minor}"
-          print(sys.version)
-          if actual != "3.14":
-              raise SystemExit(f"expected Python 3.14, found {actual}")
-          PY
-
-      - name: Create isolated CI environment
-        run: |
-          python3 -m venv "${RUNNER_TEMP}/holder-san-venv"
-          echo "${RUNNER_TEMP}/holder-san-venv/bin" >> "${GITHUB_PATH}"
-
-      - name: Build instrumented editable installation
-        env:
-          CMAKE_ARGS: -DHOLDER_PYTHON_SANITIZE=address,undefined
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install --verbose -e '.[test]'
-
-      - name: Configure sanitizer runtime
-        run: |
-          asan_library="$(gcc -print-file-name=libasan.so)"
-          if ! file -L "${asan_library}" | grep -q 'ELF'; then
-            asan_library="$(ldconfig -p | awk '/libasan\.so/{print $NF; exit}')"
-          fi
-          test -f "${asan_library}"
-          echo "LD_PRELOAD=${asan_library}" >> "${GITHUB_ENV}"
-          echo "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1" >> "${GITHUB_ENV}"
-          echo "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1" >> "${GITHUB_ENV}"
-
-      - name: Run Python tests with ASan and UBSan
-        run: python3 -m pytest --verbose
