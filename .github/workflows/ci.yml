@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.14"
+
+    steps:
+      - name: Check out holder-python and holder-core
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libssl-dev \
+            nlohmann-json3-dev \
+            libyaml-cpp-dev \
+            libspdlog-dev \
+            libsqlite3-dev \
+            libsodium-dev \
+            libgit2-dev \
+            libmd4c-dev \
+            libsecret-1-dev
+
+      - name: Install packaging tools
+        run: python -m pip install --upgrade pip build
+
+      - name: Build and install holder-python with test dependencies
+        run: python -m pip install --verbose '.[test]'
+
+      - name: Show installed build
+        run: |
+          python --version
+          python -m pip show holder pandas
+          python -c 'import holder; print(holder.__file__)'
+
+      - name: Run Python tests
+        run: python -m pytest --verbose
+
+      - name: Run strict type checking
+        run: python -m mypy
+
+      - name: Run examples
+        run: |
+          python examples/card_lifecycle.py
+          python examples/detached_records.py
+          python examples/pandas_analysis.py
+
+      - name: Build wheel
+        run: |
+          python -m build --wheel --outdir dist
+          ls -lh dist
+
+      - name: Install wheel in a fresh base environment
+        run: |
+          python -m venv "${RUNNER_TEMP}/holder-wheel-venv"
+          "${RUNNER_TEMP}/holder-wheel-venv/bin/python" -m pip install --upgrade pip
+          "${RUNNER_TEMP}/holder-wheel-venv/bin/python" -m pip install --verbose dist/*.whl
+
+      - name: Smoke-test installed wheel without pandas
+        run: |
+          "${RUNNER_TEMP}/holder-wheel-venv/bin/python" - <<'PY'
+          import importlib.util
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          assert importlib.util.find_spec("pandas") is None
+
+          import holder
+
+          assert "pandas" not in sys.modules
+          with tempfile.TemporaryDirectory(prefix="holder-wheel-smoke-") as temporary:
+              with holder.open(Path(temporary) / "data") as context:
+                  project = context.create_project("Wheel smoke test")
+                  card = context.create_card(
+                      project.project_id, "Installed wheel", "standalone body"
+                  )
+                  assert context.get_card_content(card.card_id) == "standalone body"
+                  assert context.cards.to_records(project.project_id)[0]["card_id"] == card.card_id
+                  try:
+                      context.cards.to_dataframe(project.project_id)
+                  except ModuleNotFoundError as error:
+                      assert "holder[pandas]" in str(error)
+                  else:
+                      raise AssertionError("base wheel unexpectedly provided pandas")
+          PY
+
+  sanitizers:
+    name: ASan + UBSan / Python 3.14
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out holder-python and holder-core
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libssl-dev \
+            nlohmann-json3-dev \
+            libyaml-cpp-dev \
+            libspdlog-dev \
+            libsqlite3-dev \
+            libsodium-dev \
+            libgit2-dev \
+            libmd4c-dev \
+            libsecret-1-dev
+
+      - name: Build instrumented editable installation
+        env:
+          CMAKE_ARGS: -DHOLDER_PYTHON_SANITIZE=address,undefined
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --verbose -e '.[test]'
+
+      - name: Configure sanitizer runtime
+        run: |
+          asan_library="$(gcc -print-file-name=libasan.so)"
+          if ! file -L "${asan_library}" | grep -q 'ELF'; then
+            asan_library="$(ldconfig -p | awk '/libasan\.so/{print $NF; exit}')"
+          fi
+          test -f "${asan_library}"
+          echo "LD_PRELOAD=${asan_library}" >> "${GITHUB_ENV}"
+          echo "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1" >> "${GITHUB_ENV}"
+          echo "UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1" >> "${GITHUB_ENV}"
+
+      - name: Run Python tests with ASan and UBSan
+        run: python -m pytest --verbose
