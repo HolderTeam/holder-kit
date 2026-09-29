@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import builtins
-from typing import Any, Literal, Mapping, overload
+from typing import TYPE_CHECKING, Any, Literal, Mapping, overload
 
 from . import _native
 from .data.card import (
+    CARD_METADATA_RECORD_FIELDS,
+    COMPLETE_CARD_RECORD_FIELDS,
     Card,
     CardMetadataRecord,
     CompleteCardRecord,
     _complete_record_from_native,
     _metadata_record_from_native,
 )
-from .data.project import Project, ProjectRecord
+from .data.project import PROJECT_RECORD_FIELDS, Project, ProjectRecord
+from .dataframe import records_to_dataframe
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 _COMPLETE_CARD_PAGE_SIZE = 256
@@ -32,6 +38,11 @@ class ProjectCollection:
 
     def to_records(self) -> builtins.list[ProjectRecord]:
         return [project.to_record() for project in self.list()]
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Return a detached, predictably typed project DataFrame."""
+
+        return records_to_dataframe(self.to_records(), PROJECT_RECORD_FIELDS)
 
 
 class CardCollection:
@@ -103,3 +114,17 @@ class CardCollection:
                 for item in self._context.list_cards(current_project_id)
             )
         return records
+
+    def to_dataframe(
+        self, project_id: str | None = None, *, include_content: bool = False
+    ) -> pd.DataFrame:
+        """Return a detached card DataFrame, optionally including bodies."""
+
+        if include_content:
+            return records_to_dataframe(
+                self.to_records(project_id, include_content=True),
+                COMPLETE_CARD_RECORD_FIELDS,
+            )
+        return records_to_dataframe(
+            self.to_records(project_id), CARD_METADATA_RECORD_FIELDS
+        )

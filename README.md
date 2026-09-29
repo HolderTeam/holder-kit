@@ -39,6 +39,12 @@ python -m pytest
 python -m mypy
 ```
 
+Install the optional pandas adapter for notebook and scientific workflows:
+
+```console
+python -m pip install -e '.[pandas]'
+```
+
 Every test uses pytest's temporary directory and never opens a user's Holder
 data directory or contacts a running daemon.
 
@@ -51,6 +57,7 @@ extension shim and the embedded `holder-core` target.
 ```console
 python examples/card_lifecycle.py
 python examples/detached_records.py
+python examples/pandas_analysis.py
 ```
 
 The examples create temporary data directories, exercise the current card
@@ -74,6 +81,20 @@ with Context("/path/to/isolated/data") as context:
 print(records[0]["content"])
 ```
 
+With the pandas extra installed, the same detached contracts are available as
+predictably typed DataFrames:
+
+```python
+with holder.open("./knowledge") as context:
+    cards = context.cards.to_dataframe()
+    complete = context.cards.to_dataframe(include_content=True)
+    projects = context.projects.to_dataframe()
+```
+
+The default card table is metadata-only and has no `content` column. Complete
+tables retain genuine empty bodies as empty strings. DataFrames are detached:
+editing them never writes to Holder.
+
 `Project` and `Card` are frozen, slotted dataclasses. `to_records()` returns
 cheap metadata-only `CardMetadataRecord` dictionaries by default;
 `include_content=True` returns `CompleteCardRecord` dictionaries using
@@ -86,6 +107,6 @@ A `Context` owns its native `holder_context` and can be closed explicitly or
 with a context manager. Native runtime failures raise `holder.HolderError`;
 invalid libholder arguments raise `ValueError`.
 
-The base package has no data-science dependencies. DataFrames, NetworkX, the
-broader libholder API, concurrency support, stable-ABI wheels, and packaging
-for platforms other than Linux remain out of scope for this increment.
+The base package has no data-science dependencies. NetworkX, the broader
+libholder API, concurrency support, stable-ABI wheels, and packaging for
+platforms other than Linux remain out of scope for this increment.

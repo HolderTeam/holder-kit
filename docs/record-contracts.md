@@ -78,3 +78,23 @@ an empty substitute body.
 
 All returned dictionaries are detached snapshots: they hold copied Python
 values and remain usable after their originating context closes.
+
+## pandas conversion
+
+`projects.to_dataframe()` and `cards.to_dataframe()` use these record-field
+constants as their authoritative column order. Card conversion is metadata-only
+by default; `include_content=True` selects the complete contract and the
+paginated authoritative-body operation.
+
+Identifiers and text use pandas' nullable `string` dtype, `sort_key` uses
+`float64`, and Holder's integer Unix timestamps become timezone-aware
+`datetime64[ns, UTC]` columns. Nullable timestamps use `NaT`; nullable strings
+use `pd.NA`. Empty DataFrames preserve the same columns and dtypes as populated
+ones. Content that was not requested has no column, while an authoritative
+empty card body is the empty string in a complete table.
+
+DataFrames contain copied Python/pandas values, retain no native context, and
+have no automatic write-back behavior. Editing one cannot modify Holder.
+Complete extraction retains the consistency limits above: each page is guarded
+by the process-local project lock, but a DataFrame assembled across pages or
+projects is not a transactionally consistent snapshot.

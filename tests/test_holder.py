@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+import sys
 from dataclasses import FrozenInstanceError
 from datetime import timezone
 from pathlib import Path
@@ -230,3 +231,12 @@ def test_metadata_records_do_not_require_card_files(tmp_path: Path) -> None:
 
         with pytest.raises(holder.HolderError, match="card content missing"):
             context.cards.to_records(project.project_id, include_content=True)
+
+
+def test_dataframe_request_explains_optional_pandas_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(sys.modules, "pandas", None)
+    with holder.open(tmp_path / "holder-data") as context:
+        with pytest.raises(ModuleNotFoundError, match=r"holder\[pandas\]"):
+            context.cards.to_dataframe()

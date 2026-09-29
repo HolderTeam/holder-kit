@@ -89,6 +89,12 @@ class Context:
         self.close()
 
 
+def open(data_dir: os.PathLike[str] | str) -> Context:
+    """Open an embedded Holder context for use directly or as a context manager."""
+
+    return Context(data_dir)
+
+
 __all__ = [
     "CARD_METADATA_RECORD_FIELDS",
     "CARD_RECORD_FIELDS",
@@ -104,4 +110,5 @@ __all__ = [
     "Project",
     "ProjectCollection",
     "ProjectRecord",
+    "open",
 ]
