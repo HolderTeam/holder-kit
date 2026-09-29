@@ -21,8 +21,10 @@ jobs:
         include:
           - runner: ubuntu-24.04
             python-version: "3.12"
+            comprehensive: false
           - runner: ubuntu-26.04
             python-version: "3.14"
+            comprehensive: true
 
     steps:
       - name: Check out holder-python and holder-core
@@ -72,42 +74,60 @@ jobs:
           echo "${RUNNER_TEMP}/holder-ci-venv/bin" >> "${GITHUB_PATH}"
 
       - name: Install packaging tools
-        run: python3 -m pip install --upgrade pip build
+        run: python3 -m pip install --upgrade pip
 
-      - name: Build and install holder-python with test dependencies
+      - name: Build and install holder-python with base test dependencies
+        if: ${{ !matrix.comprehensive }}
+        run: python3 -m pip install --verbose . 'pytest>=8'
+
+      - name: Build and install holder-python with complete test dependencies
+        if: ${{ matrix.comprehensive }}
         run: python3 -m pip install --verbose '.[test]'
 
       - name: Show installed build
         run: |
           python3 --version
           python3 -c 'import sys; print(sys.executable)'
-          python3 -m pip show holder pandas
+          python3 -m pip show holder
           python3 -c 'import holder; print(holder.__file__)'
 
-      - name: Run Python tests
+      - name: Run base Python tests
+        if: ${{ !matrix.comprehensive }}
+        run: python3 -m pytest --verbose tests/test_holder.py
+
+      - name: Run complete Python tests
+        if: ${{ matrix.comprehensive }}
         run: python3 -m pytest --verbose
 
       - name: Run strict type checking
+        if: ${{ matrix.comprehensive }}
         run: python3 -m mypy
 
-      - name: Run examples
+      - name: Run lifecycle example
+        run: python3 examples/card_lifecycle.py
+
+      - name: Run detached-record and pandas examples
+        if: ${{ matrix.comprehensive }}
         run: |
-          python3 examples/card_lifecycle.py
           python3 examples/detached_records.py
           python3 examples/pandas_analysis.py
 
       - name: Build wheel
+        if: ${{ matrix.comprehensive }}
         run: |
+          python3 -m pip install build
           python3 -m build --wheel --outdir dist
           ls -lh dist
 
       - name: Install wheel in a fresh base environment
+        if: ${{ matrix.comprehensive }}
         run: |
           python3 -m venv "${RUNNER_TEMP}/holder-wheel-venv"
           "${RUNNER_TEMP}/holder-wheel-venv/bin/python" -m pip install --upgrade pip
           "${RUNNER_TEMP}/holder-wheel-venv/bin/python" -m pip install --verbose dist/*.whl
 
       - name: Smoke-test installed wheel without pandas
+        if: ${{ matrix.comprehensive }}
         run: |
           "${RUNNER_TEMP}/holder-wheel-venv/bin/python" - <<'PY'
           import importlib.util
@@ -135,6 +155,117 @@ jobs:
                   else:
                       raise AssertionError("base wheel unexpectedly provided pandas")
           PY
+
+  macos:
+    name: macOS 15 / Python 3.12
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out holder-python and holder-core
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install native build dependencies
+        run: |
+          brew install \
+            cmake \
+            ninja \
+            pkg-config \
+            nlohmann-json \
+            yaml-cpp \
+            spdlog \
+            sqlite \
+            libsodium \
+            libgit2 \
+            md4c \
+            openssl@3
+
+      - name: Build and install holder-python
+        run: |
+          python3 -m pip install --upgrade pip
+          CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$(brew --prefix);$(brew --prefix openssl@3) -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" \
+            python3 -m pip install --verbose . 'pytest>=8'
+
+      - name: Run base Python tests
+        run: python3 -m pytest --verbose tests/test_holder.py
+
+      - name: Run lifecycle example
+        run: python3 examples/card_lifecycle.py
+
+  windows:
+    name: Windows Server 2025 / Python 3.12
+    runs-on: windows-2025
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out holder-python and holder-core
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set vcpkg paths
+        shell: pwsh
+        run: |
+          "VCPKG_ROOT=${{ github.workspace }}\.vcpkg" >> $env:GITHUB_ENV
+          "VCPKG_DEFAULT_BINARY_CACHE=${{ github.workspace }}\.vcpkg-binary-cache" >> $env:GITHUB_ENV
+
+      - name: Restore vcpkg binary package cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: holder-python-vcpkg-${{ runner.os }}-${{ hashFiles('submodules/holder-core/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            holder-python-vcpkg-${{ runner.os }}-${{ hashFiles('submodules/holder-core/vcpkg.json') }}-
+            holder-python-vcpkg-${{ runner.os }}-
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
+          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force "$env:VCPKG_DEFAULT_BINARY_CACHE" | Out-Null
+
+      - name: Build and install holder-python
+        shell: pwsh
+        run: |
+          $workspace = (Resolve-Path ".").Path.Replace('\', '/')
+          $vcpkgRoot = $env:VCPKG_ROOT.Replace('\', '/')
+          $env:CMAKE_GENERATOR = "Ninja"
+          $env:CMAKE_ARGS = "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DVCPKG_MANIFEST_DIR=$workspace/submodules/holder-core -DVCPKG_INSTALLED_DIR=$workspace/.vcpkg-installed"
+          python -m pip install --upgrade pip
+          python -m pip install --verbose . "pytest>=8"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "$workspace/.vcpkg-installed/x64-windows/bin" >> $env:GITHUB_PATH
+
+      - name: Run base Python tests
+        run: python -m pytest --verbose tests/test_holder.py
+
+      - name: Run lifecycle example
+        run: python examples/card_lifecycle.py
+
+      - name: Save vcpkg binary package cache
+        if: success() && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: holder-python-vcpkg-${{ runner.os }}-${{ hashFiles('submodules/holder-core/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
 
   sanitizers:
     name: ASan + UBSan / ubuntu-26.04 / Python 3.14
