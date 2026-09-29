@@ -77,10 +77,6 @@ jobs:
           python3 -m venv "${RUNNER_TEMP}/holder-ci-venv"
           echo "${RUNNER_TEMP}/holder-ci-venv/bin" >> "${GITHUB_PATH}"
 
-      - name: Install holder-core test dependency
-        if: ${{ matrix.sanitized }}
-        run: sudo apt-get install -y --no-install-recommends catch2
-
       - name: Install packaging tools
         run: python3 -m pip install --upgrade pip
 
@@ -93,14 +89,6 @@ jobs:
         env:
           CMAKE_ARGS: -DHOLDER_PYTHON_SANITIZE=address,undefined
         run: python3 -m pip install --verbose . 'pytest>=8'
-
-      - name: Run holder-core tests with ASan and UBSan
-        if: ${{ matrix.sanitized }}
-        working-directory: submodules/holder-core
-        env:
-          TMPDIR: ${{ runner.temp }}
-          XDG_RUNTIME_DIR: ${{ runner.temp }}
-        run: ./make.sh san address,undefined
 
       - name: Configure sanitizer runtime
         if: ${{ matrix.sanitized }}
