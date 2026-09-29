@@ -127,8 +127,7 @@ jobs:
           python3 -m pytest --verbose \
             tests/test_holder.py::test_native_extension_imports \
             tests/test_holder.py::test_complete_card_lifecycle \
-            tests/test_holder.py::test_context_destruction_releases_native_resources \
-            tests/test_holder.py::test_failed_context_initialization_releases_partial_state
+            tests/test_holder.py::test_context_destruction_releases_native_resources
 
       - name: Run complete Python tests
         if: ${{ matrix.comprehensive }}
@@ -280,20 +279,37 @@ jobs:
       - name: Build and install holder-python
         shell: pwsh
         run: |
-          $workspace = (Resolve-Path ".").Path.Replace('\', '/')
+          $workspacePath = (Resolve-Path ".").Path
+          $workspace = $workspacePath.Replace('\', '/')
           $vcpkgRoot = $env:VCPKG_ROOT.Replace('\', '/')
           $env:CMAKE_GENERATOR = "Ninja"
           $env:CMAKE_ARGS = "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DVCPKG_MANIFEST_DIR=$workspace/submodules/holder-core -DVCPKG_INSTALLED_DIR=$workspace/.vcpkg-installed"
           python -m pip install --upgrade pip
           python -m pip install --verbose . "pytest>=8"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          "$workspace/.vcpkg-installed/x64-windows/bin" >> $env:GITHUB_PATH
+          $runtimeDir = Join-Path $workspacePath ".vcpkg-installed\x64-windows\bin"
+          if (-not (Test-Path $runtimeDir)) { throw "Missing vcpkg runtime directory: $runtimeDir" }
+          $runtimeDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "VCPKG_RUNTIME_DIR=$runtimeDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Verify native extension and runtime dependencies
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:VCPKG_RUNTIME_DIR;$env:PATH"
+          Get-ChildItem "$env:VCPKG_RUNTIME_DIR\*.dll" | Select-Object -ExpandProperty Name
+          python -c "import holder; print(holder.__file__)"
 
       - name: Run base Python tests
-        run: python -m pytest --verbose tests/test_holder.py
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:VCPKG_RUNTIME_DIR;$env:PATH"
+          python -m pytest --verbose tests/test_holder.py
 
       - name: Run lifecycle example
-        run: python examples/card_lifecycle.py
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:VCPKG_RUNTIME_DIR;$env:PATH"
+          python examples/card_lifecycle.py
 
       - name: Save vcpkg binary package cache
         if: success() && github.event_name != 'pull_request'
