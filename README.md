@@ -1,9 +1,8 @@
 # holder-python
 
-`holder-python` provides an initial CPython extension for running libholder
-directly inside a Python process. It currently offers a deliberately small
-vertical slice: open an isolated Holder context, create a project, and create,
-list, retrieve, and update cards.
+`holder-python` provides CPython bindings for running libholder directly inside
+a Python process. It offers a small typed interface for projects and cards,
+including detached dataclasses and plain dictionary record exports.
 
 The compiled extension is `holder._native`. The `holder` package supplies the
 small public wrapper and loads the database schema shipped from the pinned
@@ -37,6 +36,7 @@ and development libraries required by `holder-core`.
 ```console
 python -m pip install -e '.[test]'
 python -m pytest
+python -m mypy
 ```
 
 Every test uses pytest's temporary directory and never opens a user's Holder
@@ -50,10 +50,11 @@ extension shim and the embedded `holder-core` target.
 
 ```console
 python examples/card_lifecycle.py
+python examples/detached_records.py
 ```
 
-The example creates a temporary data directory, exercises the complete current
-card lifecycle, and removes the directory when it exits.
+The examples create temporary data directories, exercise the current card
+lifecycle and detached records, and remove their directories when they exit.
 
 ## Current API
 
@@ -62,17 +63,24 @@ from holder import Context
 
 with Context("/path/to/isolated/data") as context:
     project = context.create_project("Notes")
-    card = context.create_card(project["project_id"], "A card", "Body")
-    context.get_card_content(card["card_id"])
-    context.update_card(card["card_id"], "New body", "New title")
-    context.list_cards(project["project_id"])
+    card = context.create_card(project.project_id, "A card", "Body")
+    context.update_card(card.card_id, "New body", "New title")
+    records = context.cards.to_records(project.project_id)
+
+# Detached records remain usable after the context has closed.
+print(records[0]["content"])
 ```
 
-Results are ordinary Python dictionaries, lists, and strings decoded from the
-public libholder JSON API. A `Context` owns its native `holder_context` and can
-be closed explicitly or with a context manager. Native runtime failures raise
-`holder.HolderError`; invalid libholder arguments raise `ValueError`.
+`Project` and `Card` are frozen, slotted dataclasses. `to_records()` returns
+plain typed dictionaries containing only standard-library values. Their stable
+schemas, null and timestamp conventions, extraction behavior, and current bulk
+read limitations are documented in
+[Detached record contracts](docs/record-contracts.md).
 
-This first release intentionally omits the broader libholder API, high-level
-domain objects, concurrency support, stable-ABI wheels, and packaging for
-platforms other than Linux.
+A `Context` owns its native `holder_context` and can be closed explicitly or
+with a context manager. Native runtime failures raise `holder.HolderError`;
+invalid libholder arguments raise `ValueError`.
+
+The base package has no data-science dependencies. DataFrames, NetworkX, the
+broader libholder API, concurrency support, stable-ABI wheels, and packaging
+for platforms other than Linux remain out of scope for this increment.

@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import os
 from importlib.resources import files
-from typing import Any
 
 from . import _native
+from .collections import CardCollection, ProjectCollection
+from .models import Card, Project
+from .records import (
+    CARD_RECORD_FIELDS,
+    PROJECT_RECORD_FIELDS,
+    CardRecord,
+    ProjectRecord,
+)
 
 HolderError = _native.HolderError
 
@@ -30,8 +37,19 @@ class Context:
     def close(self) -> None:
         self._context.close()
 
-    def create_project(self, name: str) -> dict[str, Any]:
-        return self._context.create_project(name)
+    @property
+    def projects(self) -> ProjectCollection:
+        return ProjectCollection(self._context)
+
+    @property
+    def cards(self) -> CardCollection:
+        return CardCollection(self._context)
+
+    def create_project(self, name: str) -> Project:
+        return Project._from_native(self._context.create_project(name))
+
+    def list_projects(self) -> list[Project]:
+        return self.projects.list()
 
     def create_card(
         self,
@@ -39,19 +57,23 @@ class Context:
         title: str,
         content: str = "",
         parent_card_id: str | None = None,
-    ) -> dict[str, Any]:
-        return self._context.create_card(project_id, title, content, parent_card_id)
+    ) -> Card:
+        metadata = self._context.create_card(
+            project_id, title, content, parent_card_id
+        )
+        return Card._from_native(metadata, content)
 
-    def list_cards(self, project_id: str) -> list[dict[str, Any]]:
-        return self._context.list_cards(project_id)
+    def list_cards(self, project_id: str) -> list[Card]:
+        return self.cards.list(project_id)
 
     def get_card_content(self, card_id: str) -> str:
         return self._context.get_card_content(card_id)
 
     def update_card(
         self, card_id: str, content: str, title: str | None = None
-    ) -> dict[str, Any]:
-        return self._context.update_card(card_id, content, title)
+    ) -> Card:
+        metadata = self._context.update_card(card_id, content, title)
+        return Card._from_native(metadata, content)
 
     def __enter__(self) -> Context:
         if self.closed:
@@ -62,4 +84,15 @@ class Context:
         self.close()
 
 
-__all__ = ["Context", "HolderError"]
+__all__ = [
+    "CARD_RECORD_FIELDS",
+    "PROJECT_RECORD_FIELDS",
+    "Card",
+    "CardCollection",
+    "CardRecord",
+    "Context",
+    "HolderError",
+    "Project",
+    "ProjectCollection",
+    "ProjectRecord",
+]

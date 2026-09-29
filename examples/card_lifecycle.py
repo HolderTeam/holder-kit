@@ -15,16 +15,19 @@ def main() -> None:
         with Context(data_dir) as context:
             project = context.create_project("Python example")
             card = context.create_card(
-                project["project_id"], "Hello from Python", "Initial body"
+                project.project_id, "Hello from Python", "Initial body"
             )
-            print("Created:", json.dumps(card, indent=2))
-            print("Retrieved body:", context.get_card_content(card["card_id"]))
+            print("Created:", json.dumps(card.to_record(), indent=2))
+            print("Retrieved body:", context.get_card_content(card.card_id))
 
             updated = context.update_card(
-                card["card_id"], "Updated through libholder", "Updated from Python"
+                card.card_id, "Updated through libholder", "Updated from Python"
             )
-            print("Updated:", json.dumps(updated, indent=2))
-            print("Cards:", json.dumps(context.list_cards(project["project_id"]), indent=2))
+            print("Updated:", json.dumps(updated.to_record(), indent=2))
+            print(
+                "Records:",
+                json.dumps(context.cards.to_records(project.project_id), indent=2),
+            )
 
 
 if __name__ == "__main__":

@@ -208,6 +208,25 @@ Context_create_project(ContextObject *self, PyObject *args, PyObject *kwargs)
 }
 
 static PyObject *
+Context_list_projects(ContextObject *self, PyObject *Py_UNUSED(ignored))
+{
+    if (!ensure_context_open(self)) {
+        return NULL;
+    }
+
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_project_list(self->context, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
 Context_create_card(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *project_id = NULL;
@@ -368,6 +387,8 @@ static PyMethodDef Context_methods[] = {
     {"__exit__", (PyCFunction)Context_exit, METH_VARARGS, NULL},
     {"create_project", PyCFunction_CAST(Context_create_project),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Create a plain Holder project.")},
+    {"list_projects", (PyCFunction)Context_list_projects, METH_NOARGS,
+     PyDoc_STR("List Holder projects.")},
     {"create_card", PyCFunction_CAST(Context_create_card),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Create a card and return its metadata.")},
     {"list_cards", PyCFunction_CAST(Context_list_cards),
