@@ -1,0 +1,65 @@
+"""Small public interface to embedded libholder."""
+
+from __future__ import annotations
+
+import os
+from importlib.resources import files
+from typing import Any
+
+from . import _native
+
+HolderError = _native.HolderError
+
+
+def _schema_sql() -> str:
+    return files(__package__).joinpath("_schema.sql").read_text(encoding="utf-8")
+
+
+class Context:
+    """An embedded Holder context rooted in an isolated data directory."""
+
+    __slots__ = ("_context",)
+
+    def __init__(self, data_dir: os.PathLike[str] | str) -> None:
+        self._context = _native.Context(os.fspath(data_dir), _schema_sql())
+
+    @property
+    def closed(self) -> bool:
+        return self._context.closed
+
+    def close(self) -> None:
+        self._context.close()
+
+    def create_project(self, name: str) -> dict[str, Any]:
+        return self._context.create_project(name)
+
+    def create_card(
+        self,
+        project_id: str,
+        title: str,
+        content: str = "",
+        parent_card_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context.create_card(project_id, title, content, parent_card_id)
+
+    def list_cards(self, project_id: str) -> list[dict[str, Any]]:
+        return self._context.list_cards(project_id)
+
+    def get_card_content(self, card_id: str) -> str:
+        return self._context.get_card_content(card_id)
+
+    def update_card(
+        self, card_id: str, content: str, title: str | None = None
+    ) -> dict[str, Any]:
+        return self._context.update_card(card_id, content, title)
+
+    def __enter__(self) -> Context:
+        if self.closed:
+            raise RuntimeError("Holder context is closed")
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
+
+
+__all__ = ["Context", "HolderError"]
