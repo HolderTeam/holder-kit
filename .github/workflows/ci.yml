@@ -46,7 +46,7 @@ jobs:
         with:
           python-version: "3.12"
       - id: resolve
-        uses: HolderTeam/holder-core/.github/actions/core-sdk@shared-sdk-consumers
+        uses: HolderTeam/holder-core/.github/actions/core-sdk@main
         with:
           command: resolve
           core-ref: ${{ inputs.core_ref || 'latest-green' }}

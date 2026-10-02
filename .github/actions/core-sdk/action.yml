@@ -7,7 +7,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: HolderTeam/holder-core/.github/actions/core-sdk@shared-sdk-consumers
+    - uses: HolderTeam/holder-core/.github/actions/core-sdk@main
       with:
         commit: ${{ inputs.commit }}
     - name: Configure Python build tools
