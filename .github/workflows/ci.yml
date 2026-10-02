@@ -11,8 +11,16 @@ on:
         description: Core version tag or full commit SHA (empty selects latest-green)
         required: false
         type: string
-  schedule:
-    - cron: '17 */6 * * *'
+  workflow_call:
+    inputs:
+      core_ref:
+        description: Exact published core commit to test
+        required: true
+        type: string
+      python_ref:
+        description: Python source revision (resolved once for all jobs)
+        default: main
+        type: string
 
 permissions:
   contents: read
@@ -23,10 +31,17 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       commit: ${{ steps.resolve.outputs.commit }}
+      python_commit: ${{ steps.source.outputs.python_commit }}
     steps:
       - uses: actions/checkout@v7
         with:
+          repository: HolderTeam/holder-python
+          ref: ${{ github.repository == 'HolderTeam/holder-python' && github.sha || inputs.python_ref || 'main' }}
           persist-credentials: false
+      - id: source
+        name: Record Python source revision
+        shell: bash
+        run: echo "python_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -70,6 +85,8 @@ jobs:
       - name: Check out holder-python
         uses: actions/checkout@v7
         with:
+          repository: HolderTeam/holder-python
+          ref: ${{ needs.core-sdk.outputs.python_commit }}
           persist-credentials: false
 
       - name: Fetch verified core SDK
@@ -216,6 +233,8 @@ jobs:
       - name: Check out holder-python
         uses: actions/checkout@v7
         with:
+          repository: HolderTeam/holder-python
+          ref: ${{ needs.core-sdk.outputs.python_commit }}
           persist-credentials: false
 
       - name: Set up Python 3.12
@@ -265,6 +284,8 @@ jobs:
       - name: Check out holder-python
         uses: actions/checkout@v7
         with:
+          repository: HolderTeam/holder-python
+          ref: ${{ needs.core-sdk.outputs.python_commit }}
           persist-credentials: false
 
       - name: Set up Python 3.12
