@@ -45,19 +45,11 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Test SDK selection and validation
-        run: python -m unittest discover -s tests -p test_core_sdk.py -v
       - id: resolve
-        name: Resolve latest-green or explicit core pin
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HOLDER_CORE_REF: ${{ inputs.core_ref || 'latest-green' }}
-        run: python scripts/core-sdk.py resolve
-      - uses: actions/upload-artifact@v4
+        uses: HolderTeam/holder-core/.github/actions/core-sdk@shared-sdk-consumers
         with:
-          name: core-selection
-          path: out/core-selection.json
-          if-no-files-found: error
+          command: resolve
+          core-ref: ${{ inputs.core_ref || 'latest-green' }}
 
   linux:
     needs: core-sdk

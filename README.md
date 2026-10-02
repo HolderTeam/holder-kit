@@ -17,6 +17,7 @@ version tag or full commit SHA pins a Framework RC or release.
 
 ```console
 git clone https://github.com/HolderTeam/holder-python.git
+git clone https://github.com/HolderTeam/holder-core.git
 cd holder-python
 python3 -m venv .venv
 source .venv/bin/activate
@@ -25,6 +26,11 @@ export HOLDER_CORE_SDK="$(python scripts/core-sdk.py fetch)"
 export SKBUILD_CMAKE_BUILD_TYPE=RelWithDebInfo
 python -m pip install -e .
 ```
+
+The local `scripts/core-sdk.py` command delegates to the shared tool in the
+sibling core checkout. `HOLDER_CORE_SDK_TOOL` can select another checkout's
+`scripts/core-sdk.py`. CI calls core's shared action directly, so SDK selection
+and validation have one implementation owned and tested by core.
 
 On Windows, run `fetch --github-env` in GitHub Actions, or set
 `HOLDER_CORE_SDK` to the printed SDK path and configure CMake with the SDK's
