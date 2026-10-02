@@ -44,6 +44,10 @@ development dependencies are rejected with a clear error.
 
 The build uses CMake through scikit-build-core and requires a C/C++ compiler.
 Linux and macOS also need core's distribution/Homebrew development dependencies.
+The canonical Linux SDK uses the Ubuntu 24.04 dependency ABI. CI tests Python
+3.12 and 3.14 on that baseline; native builds for other Ubuntu series will use
+their matching core Debian packages. Mixing the static SDK with a newer
+distribution's C++ dependency ABI can fail at import time.
 Windows runtime DLLs and their license notices are installed beside the extension.
 Installed SDK builds include `holder/_core_build.json` with the exact core commit,
 version, platform, build configuration, and compiler, plus the matching schema.

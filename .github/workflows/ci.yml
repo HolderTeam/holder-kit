@@ -58,8 +58,10 @@ jobs:
             python-version: "3.12"
             comprehensive: true
             sanitized: false
-          - runner: ubuntu-26.04
-            name: Ubuntu 26.04 / Python 3.14 / native + sanitizers
+          # Use the canonical SDK's distribution dependency ABI. Native
+          # Ubuntu-series integration belongs to the Debian package builds.
+          - runner: ubuntu-24.04
+            name: Ubuntu 24.04 / Python 3.14 / shim sanitizers
             python-version: "3.14"
             comprehensive: false
             sanitized: true
@@ -95,20 +97,10 @@ jobs:
             libmd4c-dev \
             libsecret-1-dev
 
-      - name: Verify runner Python
-        env:
-          EXPECTED_PYTHON: ${{ matrix.python-version }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import sys
-
-          actual = f"{sys.version_info.major}.{sys.version_info.minor}"
-          expected = os.environ["EXPECTED_PYTHON"]
-          print(sys.version)
-          if actual != expected:
-              raise SystemExit(f"expected Python {expected}, found {actual}")
-          PY
+      - name: Set up selected Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Create isolated CI environment
         run: |
