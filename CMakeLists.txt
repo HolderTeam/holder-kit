@@ -5,7 +5,12 @@ project(holder_python LANGUAGES C CXX)
 set(HOLDER_PYTHON_SANITIZE "" CACHE STRING
   "Sanitizers for the Python native shim (for example address,undefined)")
 
-set(HOLDER_CORE_SDK "$ENV{HOLDER_CORE_SDK}" CACHE PATH "Verified installed core SDK")
+set(HOLDER_CORE_SDK "" CACHE PATH "Verified installed core SDK")
+if(NOT "$ENV{HOLDER_CORE_SDK}" STREQUAL "")
+  # pip can reuse its build directory across core promotions. Refresh the
+  # environment selection rather than retaining an older cached SDK path.
+  set(HOLDER_CORE_SDK "$ENV{HOLDER_CORE_SDK}")
+endif()
 set(HOLDER_PYTHON_CORE_SOURCE "" CACHE PATH "Explicit source-build development override")
 if(HOLDER_PYTHON_CORE_SOURCE)
   set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -15,7 +20,8 @@ else()
   if(NOT EXISTS "${HOLDER_CORE_SDK}/libholder-manifest.json")
     message(FATAL_ERROR "Missing core SDK. Run scripts/core-sdk.py resolve and fetch, then set HOLDER_CORE_SDK. No automatic source fallback is available.")
   endif()
-  find_package(holder CONFIG REQUIRED PATHS "${HOLDER_CORE_SDK}/lib/cmake/holder" NO_DEFAULT_PATH)
+  set(holder_DIR "${HOLDER_CORE_SDK}/lib/cmake/holder" CACHE PATH "Selected core CMake package" FORCE)
+  find_package(holder CONFIG REQUIRED PATHS "${holder_DIR}" NO_DEFAULT_PATH)
   set(holder_schema "${HOLDER_CORE_SDK}/share/holder/schema/schema.sql")
   install(FILES "${HOLDER_CORE_SDK}/libholder-manifest.json" DESTINATION holder RENAME _core_build.json)
   if(WIN32)
