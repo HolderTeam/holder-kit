@@ -11,6 +11,7 @@ if(NOT "$ENV{HOLDER_CORE_SDK}" STREQUAL "")
   # environment selection rather than retaining an older cached SDK path.
   set(HOLDER_CORE_SDK "$ENV{HOLDER_CORE_SDK}")
 endif()
+file(TO_CMAKE_PATH "${HOLDER_CORE_SDK}" HOLDER_CORE_SDK)
 set(HOLDER_PYTHON_CORE_SOURCE "" CACHE PATH "Explicit source-build development override")
 if(HOLDER_PYTHON_CORE_SOURCE)
   set(BUILD_TESTING OFF CACHE BOOL "" FORCE)

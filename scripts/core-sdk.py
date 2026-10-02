@@ -181,7 +181,7 @@ def main():
                            " -DVCPKG_TARGET_TRIPLET=x64-windows -DVCPKG_MANIFEST_MODE=OFF -DVCPKG_APPLOCAL_DEPS=OFF")
         if args.github_env:
             with open(os.environ["GITHUB_ENV"], "a") as output:
-                output.write(f"HOLDER_CORE_SDK={sdk}\nCMAKE_ARGS={cmake_args}\nSKBUILD_CMAKE_BUILD_TYPE={args.build_type}\n")
+                output.write(f"HOLDER_CORE_SDK={sdk.as_posix()}\nCMAKE_ARGS={cmake_args}\nSKBUILD_CMAKE_BUILD_TYPE={args.build_type}\n")
         print(sdk)
 
 
