@@ -7,17 +7,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/download-artifact@v4
+    - uses: HolderTeam/holder-core/.github/actions/core-sdk@main
       with:
-        name: core-selection
-        path: out
-    - uses: actions/cache@v4
-      with:
-        path: .core-sdk
-        key: core-sdk-${{ inputs.commit }}-${{ runner.os }}-${{ runner.arch }}-RelWithDebInfo-v1
-    - name: Verify and unpack selected SDK
+        commit: ${{ inputs.commit }}
+    - name: Configure Python build tools
       shell: bash
-      run: python scripts/core-sdk.py fetch --github-env
-    - name: Select Ninja generator
-      shell: bash
-      run: echo 'CMAKE_GENERATOR=Ninja' >> "$GITHUB_ENV"
+      run: |
+        echo 'CMAKE_GENERATOR=Ninja' >> "$GITHUB_ENV"
+        echo "SKBUILD_CMAKE_BUILD_TYPE=$HOLDER_CORE_BUILD_TYPE" >> "$GITHUB_ENV"
