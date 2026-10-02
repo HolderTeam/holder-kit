@@ -273,6 +273,82 @@ Context_create_card(ContextObject *self, PyObject *args, PyObject *kwargs)
 }
 
 static PyObject *
+Context_list_links(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *card_id = NULL;
+    static char *keywords[] = {"card_id", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s:list_links", keywords, &card_id)) {
+        return NULL;
+    }
+    if (!ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_list_links(self->context, card_id, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
+Context_add_link(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *from_card_id = NULL;
+    const char *to_card_id = NULL;
+    const char *kind = NULL;
+    const char *label = NULL;
+    static char *keywords[] = {"from_card_id", "to_card_id", "kind", "label", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sss|z:add_link", keywords,
+                                    &from_card_id, &to_card_id, &kind, &label)) {
+        return NULL;
+    }
+    if (!ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_link_add(
+        self->context, from_card_id, to_card_id, kind, label, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
+Context_remove_link(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *from_card_id = NULL;
+    const char *to_card_id = NULL;
+    const char *kind = NULL;
+    static char *keywords[] = {"from_card_id", "to_card_id", "kind", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sss:remove_link", keywords,
+                                    &from_card_id, &to_card_id, &kind)) {
+        return NULL;
+    }
+    if (!ensure_context_open(self)) {
+        return NULL;
+    }
+    holder_error *error = NULL;
+    const int result = holder_card_link_remove(
+        self->context, from_card_id, to_card_id, kind, &error);
+    if (result != HOLDER_OK) {
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
 Context_list_cards(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *project_id = NULL;
@@ -422,6 +498,12 @@ PyDoc_STRVAR(
 );
 
 static PyMethodDef Context_methods[] = {
+    {"list_links", PyCFunction_CAST(Context_list_links),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Read a card's connections and hierarchy.")},
+    {"add_link", PyCFunction_CAST(Context_add_link),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Add or update an explicit card connection.")},
+    {"remove_link", PyCFunction_CAST(Context_remove_link),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Remove an explicit card connection.")},
     {"close", (PyCFunction)Context_close, METH_NOARGS,
      PyDoc_STR("Release the native Holder context. Safe to call repeatedly.")},
     {"__enter__", (PyCFunction)Context_enter, METH_NOARGS, NULL},

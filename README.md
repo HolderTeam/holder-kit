@@ -1,8 +1,9 @@
 # holder-python
 
 `holder-python` provides CPython bindings for running libholder directly inside
-a Python process. It offers a small typed interface for projects and cards,
-including detached dataclasses and plain dictionary record exports.
+a Python process. It offers a small typed interface for projects, cards and
+explicit connections, including detached dataclasses, plain dictionary records,
+and optional pandas and NetworkX exports.
 
 The compiled extension is `holder._native`. The `holder` package supplies the
 small public wrapper and loads the database schema shipped from the selected
@@ -91,10 +92,12 @@ library is not instrumented by this job.
 python examples/card_lifecycle.py
 python examples/detached_records.py
 python examples/pandas_analysis.py
+python examples/graph_analysis.py  # requires both pandas and graph extras
 ```
 
 The examples create temporary data directories, exercise the current card
-lifecycle and detached records, and remove their directories when they exit.
+lifecycle, detached records and graph/table analysis, and remove their
+directories when they exit.
 
 ## Current API
 
@@ -140,7 +143,55 @@ A `Context` owns its native `holder_context` and can be closed explicitly or
 with a context manager. Native runtime failures raise `holder.HolderError`;
 invalid libholder arguments raise `ValueError`.
 
-The base package has no data-science dependencies. NetworkX, the broader
+## Connections and graphs
+
+Explicit connections use core's add/update and remove operations:
+
+```python
+with holder.open("./knowledge") as context:
+    project = context.create_project("Graph demo")
+    first = context.create_card(project.project_id, "Evidence")
+    second = context.create_card(project.project_id, "Report")
+    context.connections.add(second.card_id, first.card_id, "depends_on", "Needs evidence")
+    links = context.connections.to_records(project.project_id)
+    edges = context.connections.to_dataframe(project.project_id)  # pandas extra
+    graph = context.to_networkx(project.project_id)                # graph extra
+```
+
+Install `holder[graph]` (or `pip install -e '.[graph]'` from this checkout) for
+NetworkX. Neither pandas nor NetworkX is imported by ordinary base-package use.
+For the combined example, install `pip install -e '.[pandas,graph]'`.
+
+`connections.add(from_card_id, to_card_id, kind, label=None)` adds or updates
+one explicit card connection. Repeating the same source/target/kind updates its
+label and core timestamp; different kinds remain distinct. Custom kinds are
+allowed. `connections.remove(from_card_id, to_card_id, kind)` is a no-op when
+the matching connection is absent. These are individual core operations, with
+no Python batch transaction or optimistic concurrency promise.
+
+Connection exports contain outgoing links of selected live source cards, once
+each. They preserve core's `to_type`, nullable label and target title, and source
+project ID. Backlinks are not duplicated, and hierarchy and inline wikilinks
+are not converted to explicit connections. Core currently requires one link
+read per source card. There is no atomic snapshot across those reads.
+
+`context.to_networkx(project_id=None, include_content=False)` returns a detached
+`MultiDiGraph` with card IDs as node identities and connection kinds as edge
+keys. All selected live cards are nodes, including isolated cards. Node
+attributes use card metadata records (or complete records with
+`include_content=True`); edge attributes use the connection record contract.
+Each selected card has `exported=True`. Card targets outside the selection or
+unresolved in core are retained as minimal nodes with `card_id`, nullable
+`title` and `exported=False`; this flag means their full record was not exported,
+not that core confirmed their existence or deletion status. Project filtering
+selects source cards, so cross-project target nodes can appear. Non-card targets
+remain in connection records/tables but are excluded from this card graph.
+Editing the graph or a connection table never writes back to Holder.
+
+See [Detached record contracts](docs/record-contracts.md) for schemas and limits.
+Combined `to_dataframes()`, milestones and tags remain subsequent slices.
+
+The base package has no data-science dependencies. The broader
 libholder API, concurrency support, stable-ABI wheels, public pip distribution, and Debian/Ubuntu `python3-holder`
 packaging remain later work. CI validates the SDK consumer on Linux, macOS,
 and Windows.

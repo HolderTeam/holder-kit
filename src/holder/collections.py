@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import builtins
-from typing import TYPE_CHECKING, Any, Literal, Mapping, overload
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, overload
 
 from . import _native
 from .data.card import (
@@ -16,6 +16,7 @@ from .data.card import (
     _metadata_record_from_native,
 )
 from .data.project import PROJECT_RECORD_FIELDS, Project, ProjectRecord
+from .data.connection import CONNECTION_RECORD_FIELDS, ConnectionRecord
 from .dataframe import records_to_dataframe
 
 if TYPE_CHECKING:
@@ -23,6 +24,54 @@ if TYPE_CHECKING:
 
 
 _COMPLETE_CARD_PAGE_SIZE = 256
+
+
+class ConnectionCollection:
+    """Explicit outgoing connections of live cards, read through core."""
+
+    __slots__ = ("_context",)
+
+    def __init__(self, context: _native.Context) -> None:
+        self._context = context
+
+    def add(
+        self, from_card_id: str, to_card_id: str, kind: str,
+        label: str | None = None,
+    ) -> None:
+        """Add or update a connection using core's existing upsert semantics."""
+
+        self._context.add_link(from_card_id, to_card_id, kind, label)
+
+    def remove(self, from_card_id: str, to_card_id: str, kind: str) -> None:
+        """Remove a connection; an absent matching connection is a no-op."""
+
+        self._context.remove_link(from_card_id, to_card_id, kind)
+
+    def to_records(self, project_id: str | None = None) -> builtins.list[ConnectionRecord]:
+        return self._records_from_cards(CardCollection(self._context).to_records(project_id))
+
+    def _records_from_cards(
+        self, cards: Iterable[CardMetadataRecord],
+    ) -> builtins.list[ConnectionRecord]:
+        records: builtins.list[ConnectionRecord] = []
+        for card in cards:
+            for link in self._context.list_links(card["card_id"])["outgoing"]:
+                records.append({
+                    "project_id": card["project_id"],
+                    "from_card_id": card["card_id"],
+                    "to_card_id": str(link["to_card_id"]),
+                    "to_type": str(link["to_type"]),
+                    "kind": str(link["kind"]),
+                    "label": None if link["label"] is None else str(link["label"]),
+                    "created_at": int(link["created_at"]),
+                    "to_title": None if link["to_title"] is None else str(link["to_title"]),
+                })
+        return records
+
+    def to_dataframe(self, project_id: str | None = None) -> pd.DataFrame:
+        """Return a detached connection table with the shared record schema."""
+
+        return records_to_dataframe(self.to_records(project_id), CONNECTION_RECORD_FIELDS)
 
 
 class ProjectCollection:
