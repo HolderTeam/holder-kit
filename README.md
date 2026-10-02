@@ -52,9 +52,15 @@ Windows runtime DLLs and their license notices are installed beside the extensio
 Installed SDK builds include `holder/_core_build.json` with the exact core commit,
 version, platform, build configuration, and compiler, plus the matching schema.
 
-For explicit core source development, initialise the submodule and pass
-`--config-settings=cmake.define.HOLDER_PYTHON_CORE_SOURCE=<absolute-core-source-path>`
-to pip. This opt-in path builds core; normal CI does not initialise the submodule.
+For explicit core source development, clone `holder-core` beside this repository
+and pass its absolute path to pip:
+
+```sh
+python -m pip install -e . \
+  --config-settings=cmake.define.HOLDER_PYTHON_CORE_SOURCE="$(cd ../holder-core && pwd)"
+```
+
+This opt-in path builds core. Normal builds and CI use the published SDK.
 
 CI runs on Python pushes and pull requests; manual CI accepts a `core_ref` pin.
 The same workflow exposes `workflow_call` for core's publication integration:
