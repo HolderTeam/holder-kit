@@ -6,12 +6,46 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      core_ref:
+        description: Core version tag or full commit SHA (empty selects latest-green)
+        required: false
+        type: string
+  schedule:
+    - cron: '17 */6 * * *'
 
 permissions:
   contents: read
 
 jobs:
+  core-sdk:
+    name: Resolve core SDK once
+    runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.resolve.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Test SDK selection and validation
+        run: python -m unittest discover -s tests -p test_core_sdk.py -v
+      - id: resolve
+        name: Resolve latest-green or explicit core pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOLDER_CORE_REF: ${{ inputs.core_ref || 'latest-green' }}
+        run: python scripts/core-sdk.py resolve
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-selection
+          path: out/core-selection.json
+          if-no-files-found: error
+
   linux:
+    needs: core-sdk
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
@@ -31,11 +65,15 @@ jobs:
             sanitized: true
 
     steps:
-      - name: Check out holder-python and holder-core
+      - name: Check out holder-python
         uses: actions/checkout@v7
         with:
-          submodules: recursive
           persist-credentials: false
+
+      - name: Fetch verified core SDK
+        uses: ./.github/actions/core-sdk
+        with:
+          commit: ${{ needs.core-sdk.outputs.commit }}
 
       - name: Install native build dependencies
         run: |
@@ -86,9 +124,7 @@ jobs:
 
       - name: Build instrumented holder-python for lifecycle smoke tests
         if: ${{ matrix.sanitized }}
-        env:
-          CMAKE_ARGS: -DHOLDER_PYTHON_SANITIZE=address,undefined
-        run: python3 -m pip install --verbose . 'pytest>=8'
+        run: python3 -m pip install --verbose --config-settings=cmake.define.HOLDER_PYTHON_SANITIZE=address,undefined . 'pytest>=8'
 
       - name: Configure sanitizer runtime
         if: ${{ matrix.sanitized }}
@@ -179,21 +215,26 @@ jobs:
           PY
 
   macos:
+    needs: core-sdk
     name: macOS 15 / Python 3.12
     runs-on: macos-15
     timeout-minutes: 30
 
     steps:
-      - name: Check out holder-python and holder-core
+      - name: Check out holder-python
         uses: actions/checkout@v7
         with:
-          submodules: recursive
           persist-credentials: false
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+
+      - name: Fetch verified core SDK
+        uses: ./.github/actions/core-sdk
+        with:
+          commit: ${{ needs.core-sdk.outputs.commit }}
 
       - name: Install native build dependencies
         run: |
@@ -213,7 +254,7 @@ jobs:
       - name: Build and install holder-python
         run: |
           python3 -m pip install --upgrade pip
-          CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$(brew --prefix);$(brew --prefix openssl@3) -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" \
+          CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_PREFIX_PATH=$(brew --prefix);$(brew --prefix openssl@3) -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" \
             python3 -m pip install --verbose . 'pytest>=8'
 
       - name: Run base Python tests
@@ -223,15 +264,15 @@ jobs:
         run: python3 examples/card_lifecycle.py
 
   windows:
+    needs: core-sdk
     name: Windows Server 2025 / Python 3.12
     runs-on: windows-2025
     timeout-minutes: 45
 
     steps:
-      - name: Check out holder-python and holder-core
+      - name: Check out holder-python
         uses: actions/checkout@v7
         with:
-          submodules: recursive
           persist-credentials: false
 
       - name: Set up Python 3.12
@@ -242,66 +283,21 @@ jobs:
       - name: Set up MSVC developer environment
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Set vcpkg paths
-        shell: pwsh
-        run: |
-          "VCPKG_ROOT=${{ github.workspace }}\.vcpkg" >> $env:GITHUB_ENV
-          "VCPKG_DEFAULT_BINARY_CACHE=${{ github.workspace }}\.vcpkg-binary-cache" >> $env:GITHUB_ENV
-
-      - name: Restore vcpkg binary package cache
-        uses: actions/cache/restore@v4
+      - name: Fetch verified core SDK
+        uses: ./.github/actions/core-sdk
         with:
-          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: holder-python-vcpkg-${{ runner.os }}-${{ hashFiles('submodules/holder-core/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            holder-python-vcpkg-${{ runner.os }}-${{ hashFiles('submodules/holder-core/vcpkg.json') }}-
-            holder-python-vcpkg-${{ runner.os }}-
-
-      - name: Bootstrap vcpkg
-        shell: pwsh
-        run: |
-          git clone https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
-          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
-          New-Item -ItemType Directory -Force "$env:VCPKG_DEFAULT_BINARY_CACHE" | Out-Null
+          commit: ${{ needs.core-sdk.outputs.commit }}
 
       - name: Build and install holder-python
-        shell: pwsh
         run: |
-          $workspacePath = (Resolve-Path ".").Path
-          $workspace = $workspacePath.Replace('\', '/')
-          $vcpkgRoot = $env:VCPKG_ROOT.Replace('\', '/')
-          $env:CMAKE_GENERATOR = "Ninja"
-          $env:CMAKE_ARGS = "-DCMAKE_TOOLCHAIN_FILE=$vcpkgRoot/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DVCPKG_MANIFEST_DIR=$workspace/submodules/holder-core -DVCPKG_INSTALLED_DIR=$workspace/.vcpkg-installed"
           python -m pip install --upgrade pip
           python -m pip install --verbose . "pytest>=8"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $runtimeDir = Join-Path $workspacePath ".vcpkg-installed\x64-windows\bin"
-          if (-not (Test-Path $runtimeDir)) { throw "Missing vcpkg runtime directory: $runtimeDir" }
-          $runtimeDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "VCPKG_RUNTIME_DIR=$runtimeDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Verify native extension and runtime dependencies
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:VCPKG_RUNTIME_DIR;$env:PATH"
-          Get-ChildItem "$env:VCPKG_RUNTIME_DIR\*.dll" | Select-Object -ExpandProperty Name
-          python -c "import holder; print(holder.__file__)"
+      - name: Verify native extension and bundled runtime dependencies
+        run: python -c "import holder; print(holder.__file__)"
 
       - name: Run base Python tests
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:VCPKG_RUNTIME_DIR;$env:PATH"
-          python -m pytest --verbose tests/test_holder.py
+        run: python -m pytest --verbose tests/test_holder.py
 
       - name: Run lifecycle example
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:VCPKG_RUNTIME_DIR;$env:PATH"
-          python examples/card_lifecycle.py
-
-      - name: Save vcpkg binary package cache
-        if: success() && github.event_name != 'pull_request'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: holder-python-vcpkg-${{ runner.os }}-${{ hashFiles('submodules/holder-core/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: python examples/card_lifecycle.py

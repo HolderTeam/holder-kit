@@ -19,7 +19,7 @@ Repository = "https://github.com/HolderTeam/holder-python"
 
 [tool.scikit-build]
 cmake.version = ">=3.22"
-cmake.build-type = "Release"
+cmake.build-type = "RelWithDebInfo"
 build-dir = "build/{wheel_tag}"
 wheel.packages = ["src/holder"]
 
