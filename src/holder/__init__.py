@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 import os
+import sys
 from importlib.resources import files
+from pathlib import Path
+
+# Keep the directory handle alive while the extension and its bundled Windows
+# dependencies are loaded. Wheels do not require a caller-managed PATH.
+_dll_directory: object = None
+if sys.platform == "win32" and (Path(__file__).parent / ".libs").is_dir():
+    _dll_directory = os.add_dll_directory(str(Path(__file__).parent / ".libs"))
 
 from . import _native
 from .collections import CardCollection, ProjectCollection

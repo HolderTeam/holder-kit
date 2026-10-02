@@ -1,0 +1,23 @@
+name: Fetch core SDK
+description: Use the run-wide immutable core selection and verify cached SDK archives
+inputs:
+  commit:
+    description: Resolved core commit
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: core-selection
+        path: out
+    - uses: actions/cache@v4
+      with:
+        path: .core-sdk
+        key: core-sdk-${{ inputs.commit }}-${{ runner.os }}-${{ runner.arch }}-RelWithDebInfo-v1
+    - name: Verify and unpack selected SDK
+      shell: bash
+      run: python scripts/core-sdk.py fetch --github-env
+    - name: Select Ninja generator
+      shell: bash
+      run: echo 'CMAKE_GENERATOR=Ninja' >> "$GITHUB_ENV"

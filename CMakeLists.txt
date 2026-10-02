@@ -3,20 +3,33 @@ cmake_minimum_required(VERSION 3.22)
 project(holder_python LANGUAGES C CXX)
 
 set(HOLDER_PYTHON_SANITIZE "" CACHE STRING
-  "Sanitizers for the native extension and holder-core (for example address,undefined)")
+  "Sanitizers for the Python native shim (for example address,undefined)")
 
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/submodules/holder-core/CMakeLists.txt")
-  message(FATAL_ERROR
-    "Missing holder-core. Run: git submodule update --init --recursive")
+set(HOLDER_CORE_SDK "" CACHE PATH "Verified installed core SDK")
+if(NOT "$ENV{HOLDER_CORE_SDK}" STREQUAL "")
+  # pip can reuse its build directory across core promotions. Refresh the
+  # environment selection rather than retaining an older cached SDK path.
+  set(HOLDER_CORE_SDK "$ENV{HOLDER_CORE_SDK}")
 endif()
-
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-if(HOLDER_PYTHON_SANITIZE)
-  set(HOLDER_CORE_SANITIZE "${HOLDER_PYTHON_SANITIZE}" CACHE STRING "" FORCE)
+file(TO_CMAKE_PATH "${HOLDER_CORE_SDK}" HOLDER_CORE_SDK)
+set(HOLDER_PYTHON_CORE_SOURCE "" CACHE PATH "Explicit source-build development override")
+if(HOLDER_PYTHON_CORE_SOURCE)
+  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  add_subdirectory("${HOLDER_PYTHON_CORE_SOURCE}" holder-core EXCLUDE_FROM_ALL)
+  set(holder_schema "${HOLDER_PYTHON_CORE_SOURCE}/schema/schema.sql")
+else()
+  if(NOT EXISTS "${HOLDER_CORE_SDK}/libholder-manifest.json")
+    message(FATAL_ERROR "Missing core SDK. Run scripts/core-sdk.py resolve and fetch, then set HOLDER_CORE_SDK. No automatic source fallback is available.")
+  endif()
+  set(holder_DIR "${HOLDER_CORE_SDK}/lib/cmake/holder" CACHE PATH "Selected core CMake package" FORCE)
+  find_package(holder CONFIG REQUIRED PATHS "${holder_DIR}" NO_DEFAULT_PATH)
+  set(holder_schema "${HOLDER_CORE_SDK}/share/holder/schema/schema.sql")
+  install(FILES "${HOLDER_CORE_SDK}/libholder-manifest.json" DESTINATION holder RENAME _core_build.json)
+  if(WIN32)
+    install(DIRECTORY "${HOLDER_CORE_SDK}/bin/" DESTINATION holder/.libs FILES_MATCHING PATTERN "*.dll")
+    install(DIRECTORY "${HOLDER_CORE_SDK}/share/vcpkg-licenses/" DESTINATION holder/_licenses)
+  endif()
 endif()
-# Build the pinned core for the extension, but do not inherit its SDK install
-# rules into the Python wheel.
-add_subdirectory(submodules/holder-core holder-core EXCLUDE_FROM_ALL)
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 
@@ -45,10 +58,10 @@ install(TARGETS _native
   RUNTIME DESTINATION holder
 )
 
-# Ship the schema from the pinned core revision beside the Python package. The
+# Ship the schema from the selected core revision beside the Python package. The
 # Python wrapper reads this resource at runtime, so installed packages never
 # depend on the source checkout or an absolute development path.
-install(FILES submodules/holder-core/schema/schema.sql
+install(FILES "${holder_schema}"
   DESTINATION holder
   RENAME _schema.sql
 )
