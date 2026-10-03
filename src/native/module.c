@@ -295,6 +295,105 @@ Context_list_links(ContextObject *self, PyObject *args, PyObject *kwargs)
     return json_from_native_string(output);
 }
 
+typedef int (*tag_json_operation)(holder_context *, const char *, char **, holder_error **);
+
+static PyObject *
+tag_json_read(ContextObject *self, PyObject *args, PyObject *kwargs,
+              const char *argument, tag_json_operation operation)
+{
+    const char *id = NULL;
+    char *keywords[] = {(char *)argument, NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", keywords, &id) ||
+        !ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = operation(self->context, id, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
+Context_list_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return tag_json_read(self, args, kwargs, "card_id", holder_card_list_tags);
+}
+
+static PyObject *
+Context_list_editable_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return tag_json_read(self, args, kwargs, "card_id", holder_card_list_editable_tags);
+}
+
+static PyObject *
+Context_list_project_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return tag_json_read(self, args, kwargs, "project_id", holder_project_list_tags);
+}
+
+typedef int (*tag_mutation)(holder_context *, const char *, const char *, int *, holder_error **);
+
+static PyObject *
+mutate_tag(ContextObject *self, PyObject *args, PyObject *kwargs, tag_mutation operation)
+{
+    const char *card_id = NULL;
+    const char *tag = NULL;
+    static char *keywords[] = {"card_id", "tag", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss", keywords, &card_id, &tag) ||
+        !ensure_context_open(self)) {
+        return NULL;
+    }
+    int status = 0;
+    holder_error *error = NULL;
+    const int result = operation(self->context, card_id, tag, &status, &error);
+    if (result != HOLDER_OK) {
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return PyLong_FromLong(status);
+}
+
+static PyObject *
+Context_add_tag(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return mutate_tag(self, args, kwargs, holder_card_tag_add);
+}
+
+static PyObject *
+Context_remove_tag(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return mutate_tag(self, args, kwargs, holder_card_tag_remove);
+}
+
+static PyObject *
+Context_cards_with_tag(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *project_id = NULL;
+    const char *tag = NULL;
+    static char *keywords[] = {"project_id", "tag", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss:cards_with_tag", keywords,
+                                    &project_id, &tag) || !ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_cards_with_tag(self->context, project_id, tag, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
 static PyObject *
 Context_add_link(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -498,6 +597,18 @@ PyDoc_STRVAR(
 );
 
 static PyMethodDef Context_methods[] = {
+    {"list_tags", PyCFunction_CAST(Context_list_tags), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("List a card's normalized tags.")},
+    {"list_editable_tags", PyCFunction_CAST(Context_list_editable_tags), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("List tags on a card's editable trailing tag line.")},
+    {"list_project_tags", PyCFunction_CAST(Context_list_project_tags), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("List project tags and live-card counts.")},
+    {"cards_with_tag", PyCFunction_CAST(Context_cards_with_tag), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("Find live cards carrying a tag in a project.")},
+    {"add_tag", PyCFunction_CAST(Context_add_tag), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("Semantically add a tag and return core's status.")},
+    {"remove_tag", PyCFunction_CAST(Context_remove_tag), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("Remove a trailing tag and return core's status.")},
     {"list_links", PyCFunction_CAST(Context_list_links),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Read a card's connections and hierarchy.")},
     {"add_link", PyCFunction_CAST(Context_add_link),

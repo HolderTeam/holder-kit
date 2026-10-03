@@ -2,7 +2,7 @@
 
 `holder-python` provides CPython bindings for running libholder directly inside
 a Python process. It offers a small typed interface for projects, cards and
-explicit connections, including detached dataclasses, plain dictionary records,
+explicit connections and tags, including detached dataclasses, plain dictionary records,
 and optional pandas and NetworkX exports.
 
 The compiled extension is `holder._native`. The `holder` package supplies the
@@ -22,6 +22,7 @@ check out this repository and run `./make.sh` on Linux, macOS or BSD:
 ./make.sh                       # build and run pytest
 ./make.sh check                  # build, pytest and strict mypy
 ./make.sh examples graph         # print connection-table and graph analysis
+./make.sh examples tags          # semantic tag operations and table joins
 ./make.sh wheel Release          # wheel in out/make/wheels
 ```
 
@@ -186,6 +187,7 @@ python examples/card_lifecycle.py
 python examples/detached_records.py
 python examples/pandas_analysis.py
 python examples/graph_analysis.py  # requires both pandas and graph extras
+python examples/tag_analysis.py    # requires pandas extra
 ```
 
 The examples create temporary data directories, exercise the current card
@@ -233,11 +235,11 @@ cards_with_projects = tables["cards"].merge(
 ```
 
 `to_dataframes()` returns a typed `DataFrames` dictionary containing `projects`,
-`cards` and `connections`. An optional project ID scopes the project row and
+`cards`, `connections` and `tags`. An optional project ID scopes the project row and
 source cards; outgoing connections to other projects remain in the connection
-table. Unknown IDs yield three empty tables with stable schemas. Card bodies
+table. Unknown IDs yield four empty tables with stable schemas. Card bodies
 are omitted by default. Extraction reuses one project selection and the same
-selected card records for connection reads, but separate core calls do not form
+selected card records for connection and tag reads, but separate core calls do not form
 an atomic snapshot. Errors propagate; no partial result is returned.
 
 The default card table is metadata-only and has no `content` column. Complete
@@ -302,7 +304,34 @@ remain in connection records/tables but are excluded from this card graph.
 Editing the graph or a connection table never writes back to Holder.
 
 See [Detached record contracts](docs/record-contracts.md) for schemas and limits.
-Milestones and tags remain subsequent slices.
+
+Tags use core's semantic operations; Python never parses or rewrites hashtag text:
+
+```python
+with holder.open("./knowledge") as context:
+    project = context.create_project("Tags")
+    card = context.create_card(project.project_id, "Evidence", "Prose #evidence")
+    result = context.tags.add(card.card_id, "TODO")  # TagAddResult.ADDED
+    result = context.tags.remove(card.card_id, "evidence")
+    # TagRemoveResult.PRESENT_OUTSIDE_EDITABLE_TAG_LINE: prose is untouched.
+    names = context.tags.list(card.card_id)
+    editable = context.tags.list_editable(card.card_id)
+    counts = context.tags.project_counts(project.project_id)
+    matches = context.tags.cards_with_tag(project.project_id, "TODO")
+    records = context.tags.to_records(project.project_id)
+    tags = context.tags.to_dataframe(project.project_id)  # pandas extra
+```
+
+`TagRecord` describes a membership (`project_id`, `card_id`, normalized `tag`,
+`editable`), not a separate tag entity with a fabricated ID. The boolean flag
+means the tag is on core's editable trailing tag line; removing it can still
+leave an occurrence in prose. Addition returns `ADDED` or `ALREADY_PRESENT`;
+removal returns `REMOVED`, `NOT_PRESENT` or `PRESENT_OUTSIDE_EDITABLE_TAG_LINE`.
+Compare enum members explicitly, not their truthiness. Search is
+case-insensitive, project counts cover live cards, and exports are detached.
+Join `tables["tags"]` to `tables["cards"]` on `project_id` and `card_id`.
+
+Milestones remain the next entity slice.
 
 The base package has no data-science dependencies. The broader
 libholder API, concurrency support, stable-ABI wheels, public pip distribution, and Debian/Ubuntu `python3-holder`
