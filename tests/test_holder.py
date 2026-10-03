@@ -244,3 +244,5 @@ def test_dataframe_request_explains_optional_pandas_dependency(
                 context.to_dataframes()
             else:
                 context.cards.to_dataframe()
+        with pytest.raises(ModuleNotFoundError, match=r"holder\[pandas\]"):
+            context.tags.to_dataframe()

@@ -11,8 +11,10 @@ from .card import (
 )
 from .project import PROJECT_RECORD_FIELDS, Project, ProjectRecord
 from .connection import CONNECTION_RECORD_FIELDS, ConnectionRecord
+from .tag import TAG_RECORD_FIELDS, ProjectTagRecord, TaggedCardRecord, TagRecord, TagAddResult, TagRemoveResult
 
 __all__ = [
+    "TAG_RECORD_FIELDS", "ProjectTagRecord", "TaggedCardRecord", "TagRecord", "TagAddResult", "TagRemoveResult",
     "CONNECTION_RECORD_FIELDS",
     "ConnectionRecord",
     "CARD_METADATA_RECORD_FIELDS",

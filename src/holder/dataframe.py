@@ -16,6 +16,7 @@ class DataFrames(TypedDict):
     projects: pd.DataFrame
     cards: pd.DataFrame
     connections: pd.DataFrame
+    tags: pd.DataFrame
 
 
 _TIMESTAMP_FIELDS = frozenset({"created_at", "updated_at", "deleted_at"})
@@ -50,6 +51,8 @@ def records_to_dataframe(
             ).astype("datetime64[ns, UTC]")
         elif column in _FLOAT_FIELDS:
             frame[column] = frame[column].astype("float64")
+        elif column == "editable":
+            frame[column] = frame[column].astype("boolean")
         else:
             frame[column] = frame[column].astype("string")
 

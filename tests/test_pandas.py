@@ -148,7 +148,9 @@ def test_empty_combined_exports_preserve_all_schemas(
 ) -> None:
     with holder.open(tmp_path / "data") as context:
         tables: holder.DataFrames = context.to_dataframes(project_id, include_content=include_content)
-    assert list(tables) == ["projects", "cards", "connections"]
+    assert list(tables) == ["projects", "cards", "connections", "tags"]
+    assert list(tables["tags"].columns) == list(holder.TAG_RECORD_FIELDS)
+    assert tables["tags"].empty
     expected_card_dtypes = dict(CARD_METADATA_DTYPES)
     if include_content:
         expected_card_dtypes["content"] = "string"
@@ -223,7 +225,7 @@ def test_combined_export_reuses_card_selection_during_later_changes(
 
         def changing_list_cards(native_context: _native.Context, project_id: str) -> list[dict[str, Any]]:
             selected = list_cards(native_context, project_id)
-            added = context.create_card(project_id, "Added after selection")
+            added = context.create_card(project_id, "Added after selection", "#later")
             context.connections.add(added.card_id, original_card.card_id, "references")
             return selected
 
@@ -231,6 +233,7 @@ def test_combined_export_reuses_card_selection_during_later_changes(
         tables = context.to_dataframes(project.project_id)
         assert tables["cards"]["card_id"].tolist() == [original_card.card_id]
         assert tables["connections"].empty  # the later card is not a selected source
+        assert tables["tags"].empty  # tags also reuse the selected cards
 
 
 def test_combined_export_content_failures_and_closed_context(tmp_path: Path) -> None:

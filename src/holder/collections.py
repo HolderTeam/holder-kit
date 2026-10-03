@@ -17,6 +17,10 @@ from .data.card import (
 )
 from .data.project import PROJECT_RECORD_FIELDS, Project, ProjectRecord
 from .data.connection import CONNECTION_RECORD_FIELDS, ConnectionRecord
+from .data.tag import (
+    TAG_RECORD_FIELDS, ProjectTagRecord, TaggedCardRecord, TagRecord,
+    TagAddResult, TagRemoveResult,
+)
 from .dataframe import records_to_dataframe
 
 if TYPE_CHECKING:
@@ -24,6 +28,64 @@ if TYPE_CHECKING:
 
 
 _COMPLETE_CARD_PAGE_SIZE = 256
+
+
+class TagCollection:
+    """Core-extracted tags and explicit semantic mutations, not body parsing."""
+
+    __slots__ = ("_context",)
+
+    def __init__(self, context: _native.Context) -> None:
+        self._context = context
+
+    def list(self, card_id: str) -> builtins.list[str]:
+        return self._context.list_tags(card_id)
+
+    def list_editable(self, card_id: str) -> builtins.list[str]:
+        return self._context.list_editable_tags(card_id)
+
+    def add(self, card_id: str, tag: str) -> TagAddResult:
+        return TagAddResult(self._context.add_tag(card_id, tag))
+
+    def remove(self, card_id: str, tag: str) -> TagRemoveResult:
+        return TagRemoveResult(self._context.remove_tag(card_id, tag))
+
+    def project_counts(self, project_id: str) -> builtins.list[ProjectTagRecord]:
+        """Return core's live-card counts, most-used first, then tag name."""
+
+        return [
+            {"project_id": project_id, "tag": str(item["tag"]), "count": int(item["count"])}
+            for item in self._context.list_project_tags(project_id)
+        ]
+
+    def cards_with_tag(self, project_id: str, tag: str) -> builtins.list[TaggedCardRecord]:
+        """Return detached live-card IDs/titles using core's case-insensitive search."""
+
+        return [
+            {"card_id": str(item["card_id"]), "title": str(item["title"])}
+            for item in self._context.cards_with_tag(project_id, tag)
+        ]
+
+    def to_records(self, project_id: str | None = None) -> builtins.list[TagRecord]:
+        return self._records_from_cards(CardCollection(self._context).to_records(project_id))
+
+    def _records_from_cards(
+        self, cards: Iterable[CardMetadataRecord],
+    ) -> builtins.list[TagRecord]:
+        records: builtins.list[TagRecord] = []
+        for card in cards:
+            tags = self.list(card["card_id"])
+            if not tags:
+                continue
+            editable = set(self.list_editable(card["card_id"]))
+            records.extend({
+                "project_id": card["project_id"], "card_id": card["card_id"],
+                "tag": tag, "editable": tag in editable,
+            } for tag in tags)
+        return records
+
+    def to_dataframe(self, project_id: str | None = None) -> pd.DataFrame:
+        return records_to_dataframe(self.to_records(project_id), TAG_RECORD_FIELDS)
 
 
 class ConnectionCollection:

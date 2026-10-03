@@ -18,10 +18,11 @@ if sys.platform == "win32" and (Path(__file__).parent / ".libs").is_dir():
     _dll_directory = os.add_dll_directory(str(Path(__file__).parent / ".libs"))
 
 from . import _native
-from .collections import CardCollection, ConnectionCollection, ProjectCollection
+from .collections import CardCollection, ConnectionCollection, ProjectCollection, TagCollection
 from .graph import records_to_networkx
 from .dataframe import DataFrames, _require_pandas, records_to_dataframe
 from .data import (
+    TAG_RECORD_FIELDS, ProjectTagRecord, TaggedCardRecord, TagRecord, TagAddResult, TagRemoveResult,
     CARD_METADATA_RECORD_FIELDS,
     CARD_RECORD_FIELDS,
     COMPLETE_CARD_RECORD_FIELDS,
@@ -70,10 +71,14 @@ class Context:
     def connections(self) -> ConnectionCollection:
         return ConnectionCollection(self._context)
 
+    @property
+    def tags(self) -> TagCollection:
+        return TagCollection(self._context)
+
     def to_dataframes(
         self, project_id: str | None = None, *, include_content: bool = False,
     ) -> DataFrames:
-        """Export detached projects/cards/connections tables, without atomicity.
+        """Export detached projects/cards/connections/tags tables, without atomicity.
 
         Project selection applies to source cards; referenced targets can fall
         outside the selected tables. Unknown project IDs yield empty tables.
@@ -95,6 +100,7 @@ class Context:
             "projects": records_to_dataframe(projects, PROJECT_RECORD_FIELDS),
             "cards": records_to_dataframe(cards, card_fields),
             "connections": records_to_dataframe(connections, CONNECTION_RECORD_FIELDS),
+            "tags": records_to_dataframe(self.tags._records_from_cards(cards), TAG_RECORD_FIELDS),
         }
 
     def to_networkx(
@@ -154,6 +160,8 @@ def open(data_dir: os.PathLike[str] | str) -> Context:
 
 
 __all__ = [
+    "TAG_RECORD_FIELDS", "TagCollection", "ProjectTagRecord", "TaggedCardRecord",
+    "TagRecord", "TagAddResult", "TagRemoveResult",
     "CONNECTION_RECORD_FIELDS",
     "ConnectionCollection",
     "ConnectionRecord",
