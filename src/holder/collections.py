@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+import json
 from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, overload
 
 from . import _native
@@ -22,12 +23,74 @@ from .data.tag import (
     TagAddResult, TagRemoveResult,
 )
 from .dataframe import records_to_dataframe
+from .data.milestone import (
+    PROJECT_MILESTONE_RECORD_FIELDS, MilestoneRecord, ProjectMilestoneRecord,
+    MilestoneUpdate, _milestone_record_from_native, _validate_update,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
 
 
 _COMPLETE_CARD_PAGE_SIZE = 256
+
+
+class MilestoneCollection:
+    """Core-owned milestone operations and detached calendar records."""
+
+    __slots__ = ("_context",)
+
+    def __init__(self, context: _native.Context) -> None:
+        self._context = context
+
+    def list(self, card_id: str) -> builtins.list[MilestoneRecord]:
+        return [_milestone_record_from_native(item) for item in self._context.list_milestones(card_id)]
+
+    def add(
+        self, card_id: str, start_at: int, *, end_at: int | None = None,
+        all_day: bool = False, kind: str | None = None, description: str | None = None,
+    ) -> builtins.list[MilestoneRecord]:
+        """Return the card's updated full milestone list, not just the new row."""
+
+        return [_milestone_record_from_native(item) for item in self._context.add_milestone(
+            card_id, start_at, end_at, all_day, kind, description,
+        )]
+
+    def update(
+        self, project_id: str, card_id: str, milestone_id: str, changes: MilestoneUpdate,
+    ) -> MilestoneRecord:
+        _validate_update(changes)
+        return _milestone_record_from_native(self._context.update_milestone(
+            project_id, card_id, milestone_id, json.dumps(changes),
+        ))
+
+    def remove(self, card_id: str, milestone_id: str) -> None:
+        """Absent IDs or IDs belonging to another card are no-ops."""
+
+        self._context.remove_milestone(card_id, milestone_id)
+
+    def in_range(
+        self, project_id: str, from_at: int, to_at: int,
+    ) -> builtins.list[ProjectMilestoneRecord]:
+        """Select start times in [from_at, to_at], not overlapping intervals."""
+
+        return [{
+            "project_id": project_id, **_milestone_record_from_native(item),
+            "card_title": None if item["card_title"] is None else str(item["card_title"]),
+        } for item in self._context.milestones_in_range(project_id, from_at, to_at)]
+
+    def to_records(self, project_id: str | None = None) -> builtins.list[ProjectMilestoneRecord]:
+        return self._records_from_cards(CardCollection(self._context).to_records(project_id))
+
+    def _records_from_cards(
+        self, cards: Iterable[CardMetadataRecord],
+    ) -> builtins.list[ProjectMilestoneRecord]:
+        return [{
+            "project_id": card["project_id"], **milestone, "card_title": card["title"],
+        } for card in cards for milestone in self.list(card["card_id"])]
+
+    def to_dataframe(self, project_id: str | None = None) -> pd.DataFrame:
+        return records_to_dataframe(self.to_records(project_id), PROJECT_MILESTONE_RECORD_FIELDS)
 
 
 class TagCollection:

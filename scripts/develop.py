@@ -24,6 +24,7 @@ EXAMPLES = {
     "lifecycle": "card_lifecycle", "records": "detached_records",
     "pandas": "pandas_analysis", "graph": "graph_analysis",
     "tags": "tag_analysis",
+    "milestones": "milestone_analysis",
 }
 HELP = """Usage: ./make.sh [--sdk] [command] [BuildType] [args...]
 
@@ -34,7 +35,8 @@ Commands:
   check [BuildType]        Build, run tests and strict mypy
   typecheck [args]         Run mypy using the installed development environment
   wheel [BuildType]        Build a wheel into out/make/wheels
-  examples [name]          Run all examples, or lifecycle, records, pandas, graph, tags
+  examples [name]          Run all examples, or lifecycle, records, pandas, graph,
+                           tags, milestones
   setup-core              Prepare a pinned checkout in build/deps/holder-core
   sdk [core-ref]           Resolve and fetch an SDK (default latest-green)
   clean                   Remove build/make and out/make only

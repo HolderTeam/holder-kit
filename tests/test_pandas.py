@@ -148,7 +148,9 @@ def test_empty_combined_exports_preserve_all_schemas(
 ) -> None:
     with holder.open(tmp_path / "data") as context:
         tables: holder.DataFrames = context.to_dataframes(project_id, include_content=include_content)
-    assert list(tables) == ["projects", "cards", "connections", "tags"]
+    assert list(tables) == ["projects", "cards", "connections", "tags", "milestones"]
+    assert list(tables["milestones"].columns) == list(holder.PROJECT_MILESTONE_RECORD_FIELDS)
+    assert tables["milestones"].empty
     assert list(tables["tags"].columns) == list(holder.TAG_RECORD_FIELDS)
     assert tables["tags"].empty
     expected_card_dtypes = dict(CARD_METADATA_DTYPES)
@@ -226,6 +228,7 @@ def test_combined_export_reuses_card_selection_during_later_changes(
         def changing_list_cards(native_context: _native.Context, project_id: str) -> list[dict[str, Any]]:
             selected = list_cards(native_context, project_id)
             added = context.create_card(project_id, "Added after selection", "#later")
+            context.milestones.add(added.card_id, 100)
             context.connections.add(added.card_id, original_card.card_id, "references")
             return selected
 
@@ -234,6 +237,7 @@ def test_combined_export_reuses_card_selection_during_later_changes(
         assert tables["cards"]["card_id"].tolist() == [original_card.card_id]
         assert tables["connections"].empty  # the later card is not a selected source
         assert tables["tags"].empty  # tags also reuse the selected cards
+        assert tables["milestones"].empty  # milestones reuse the selection too
 
 
 def test_combined_export_content_failures_and_closed_context(tmp_path: Path) -> None:

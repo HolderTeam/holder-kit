@@ -2,7 +2,7 @@
 
 `holder-python` provides CPython bindings for running libholder directly inside
 a Python process. It offers a small typed interface for projects, cards and
-explicit connections and tags, including detached dataclasses, plain dictionary records,
+explicit connections, tags and milestones, including detached dataclasses, plain dictionary records,
 and optional pandas and NetworkX exports.
 
 The compiled extension is `holder._native`. The `holder` package supplies the
@@ -23,6 +23,7 @@ check out this repository and run `./make.sh` on Linux, macOS or BSD:
 ./make.sh check                  # build, pytest and strict mypy
 ./make.sh examples graph         # print connection-table and graph analysis
 ./make.sh examples tags          # semantic tag operations and table joins
+./make.sh examples milestones    # milestone edits, calendar range and table joins
 ./make.sh wheel Release          # wheel in out/make/wheels
 ```
 
@@ -188,6 +189,7 @@ python examples/detached_records.py
 python examples/pandas_analysis.py
 python examples/graph_analysis.py  # requires both pandas and graph extras
 python examples/tag_analysis.py    # requires pandas extra
+python examples/milestone_analysis.py  # requires pandas extra
 ```
 
 The examples create temporary data directories, exercise the current card
@@ -235,11 +237,11 @@ cards_with_projects = tables["cards"].merge(
 ```
 
 `to_dataframes()` returns a typed `DataFrames` dictionary containing `projects`,
-`cards`, `connections` and `tags`. An optional project ID scopes the project row and
+`cards`, `connections`, `tags` and `milestones`. An optional project ID scopes the project row and
 source cards; outgoing connections to other projects remain in the connection
-table. Unknown IDs yield four empty tables with stable schemas. Card bodies
+table. Unknown IDs yield five empty tables with stable schemas. Card bodies
 are omitted by default. Extraction reuses one project selection and the same
-selected card records for connection and tag reads, but separate core calls do not form
+selected card records for connection, tag and milestone reads, but separate core calls do not form
 an atomic snapshot. Errors propagate; no partial result is returned.
 
 The default card table is metadata-only and has no `content` column. Complete
@@ -331,7 +333,36 @@ Compare enum members explicitly, not their truthiness. Search is
 case-insensitive, project counts cover live cards, and exports are detached.
 Join `tables["tags"]` to `tables["cards"]` on `project_id` and `card_id`.
 
-Milestones remain the next entity slice.
+Milestones use integer Unix seconds and core-generated IDs:
+
+```python
+with holder.open("./knowledge") as context:
+    project = context.create_project("Calendar")
+    card = context.create_card(project.project_id, "Review")
+    milestones = context.milestones.add(
+        card.card_id, 1791190800, end_at=1791194400, kind="Appointment",
+    )  # returns the card's full updated milestone list
+    milestone_id = milestones[0]["milestone_id"]
+    updated = context.milestones.update(project.project_id, card.card_id, milestone_id, {
+        "description": "Bring notes", "end_at": None,
+    })  # omitted fields unchanged; None explicitly clears nullable fields
+    calendar = context.milestones.in_range(project.project_id, 1791158400, 1791244800)
+    records = context.milestones.to_records(project.project_id)
+    frame = context.milestones.to_dataframe(project.project_id)  # pandas extra
+    context.milestones.remove(card.card_id, milestone_id)
+```
+
+`list(card_id)`, `add()` and `update()` return detached `MilestoneRecord` data.
+`in_range()` and exports return `ProjectMilestoneRecord` data, adding `project_id`
+and `card_title` for joins. Calendar bounds are inclusive and select **start times**,
+not overlapping intervals. Update ownership requires matching project/card/milestone
+IDs; an absent or differently owned removal is a no-op. Join the combined
+`tables["milestones"]` table to cards on `project_id` and `card_id`.
+
+These operations preserve core's current limitations: add does not validate reversed
+spans, and add/remove failures can leave index changes if the durable write fails.
+They are not atomic transactions; see the record-contract documentation before
+building retry or bulk-write workflows. Iteration and batching are the next slice.
 
 The base package has no data-science dependencies. The broader
 libholder API, concurrency support, stable-ABI wheels, public pip distribution, and Debian/Ubuntu `python3-holder`

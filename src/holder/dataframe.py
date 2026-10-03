@@ -17,9 +17,10 @@ class DataFrames(TypedDict):
     cards: pd.DataFrame
     connections: pd.DataFrame
     tags: pd.DataFrame
+    milestones: pd.DataFrame
 
 
-_TIMESTAMP_FIELDS = frozenset({"created_at", "updated_at", "deleted_at"})
+_TIMESTAMP_FIELDS = frozenset({"created_at", "updated_at", "deleted_at", "start_at", "end_at"})
 _FLOAT_FIELDS = frozenset({"sort_key"})
 
 
@@ -51,7 +52,7 @@ def records_to_dataframe(
             ).astype("datetime64[ns, UTC]")
         elif column in _FLOAT_FIELDS:
             frame[column] = frame[column].astype("float64")
-        elif column == "editable":
+        elif column in {"editable", "all_day"}:
             frame[column] = frame[column].astype("boolean")
         else:
             frame[column] = frame[column].astype("string")
