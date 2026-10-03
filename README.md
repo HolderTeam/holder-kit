@@ -12,6 +12,42 @@ implement a REST or command-line wrapper.
 
 ## Build from source
 
+The Bash developer entry point follows the other Holder repositories:
+
+```sh
+./make.sh --help                 # also accepts help and -h
+./make.sh setup                  # create/reuse .venv, build editable test extras
+./make.sh                       # build and run pytest
+./make.sh check                  # build, pytest and strict mypy
+./make.sh examples graph         # print connection-table and graph analysis
+./make.sh wheel Release          # wheel in out/make/wheels
+```
+
+The script uses its own repository directory even when called from elsewhere,
+and invokes `.venv` directly; shell activation is optional. `build` and `setup`
+both install the editable package and test extras, including pandas and NetworkX.
+Use `./make.sh test -k connections` to pass pytest arguments, and
+`./make.sh typecheck` to check the installed development package without rebuilding.
+`./make.sh clean` removes only script-owned `build/make` and `out/make` output;
+it retains `.venv`, the SDK cache and other build directories.
+
+Normal builds use the shared SDK tool described below, reusing the saved core
+selection. `./make.sh sdk <tag-or-full-SHA>` selects a new pin; `./make.sh sdk`
+selects latest-green. Set `HOLDER_CORE_REF` to select explicitly during a build,
+or `HOLDER_CORE_SDK` to reuse an already prepared SDK. For local core development
+(including distributions with a different dependency ABI), opt into a source build:
+
+```sh
+HOLDER_PYTHON_CORE_SOURCE=../holder-core ./make.sh check
+HOLDER_PYTHON_CORE_SOURCE=../holder-core ./make.sh build Debug
+```
+
+`HOLDER_PYTHON` selects the interpreter used to create a new venv;
+`HOLDER_PYTHON_VENV` selects its path. Build types have separate native build
+directories, as do SDK and source builds. See help for the remaining commands
+and environment options. Platform/compiler dependencies still need to be
+installed as described below.
+
 Development builds use the latest green core SDK. CI resolves it once per run
 and uses the same exact core commit on Linux, macOS, and Windows. An explicit
 version tag or full commit SHA pins a Framework RC or release.
