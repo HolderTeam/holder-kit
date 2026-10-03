@@ -10,8 +10,11 @@ from .card import (
     CompleteCardRecord,
 )
 from .project import PROJECT_RECORD_FIELDS, Project, ProjectRecord
+from .connection import CONNECTION_RECORD_FIELDS, ConnectionRecord
 
 __all__ = [
+    "CONNECTION_RECORD_FIELDS",
+    "ConnectionRecord",
     "CARD_METADATA_RECORD_FIELDS",
     "CARD_RECORD_FIELDS",
     "COMPLETE_CARD_RECORD_FIELDS",

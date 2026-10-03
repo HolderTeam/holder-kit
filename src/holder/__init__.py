@@ -6,6 +6,10 @@ import os
 import sys
 from importlib.resources import files
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import networkx as nx
 
 # Keep the directory handle alive while the extension and its bundled Windows
 # dependencies are loaded. Wheels do not require a caller-managed PATH.
@@ -14,12 +18,15 @@ if sys.platform == "win32" and (Path(__file__).parent / ".libs").is_dir():
     _dll_directory = os.add_dll_directory(str(Path(__file__).parent / ".libs"))
 
 from . import _native
-from .collections import CardCollection, ProjectCollection
+from .collections import CardCollection, ConnectionCollection, ProjectCollection
+from .graph import records_to_networkx
 from .data import (
     CARD_METADATA_RECORD_FIELDS,
     CARD_RECORD_FIELDS,
     COMPLETE_CARD_RECORD_FIELDS,
     PROJECT_RECORD_FIELDS,
+    CONNECTION_RECORD_FIELDS,
+    ConnectionRecord,
     Card,
     CardMetadataRecord,
     CardRecord,
@@ -57,6 +64,21 @@ class Context:
     @property
     def cards(self) -> CardCollection:
         return CardCollection(self._context)
+
+    @property
+    def connections(self) -> ConnectionCollection:
+        return ConnectionCollection(self._context)
+
+    def to_networkx(
+        self, project_id: str | None = None, *, include_content: bool = False,
+    ) -> nx.MultiDiGraph[str]:
+        """Export explicit card connections and all selected live cards."""
+
+        cards = (
+            self.cards.to_records(project_id, include_content=True)
+            if include_content else self.cards.to_records(project_id)
+        )
+        return records_to_networkx(cards, self.connections._records_from_cards(cards))
 
     def create_project(self, name: str) -> Project:
         return Project._from_native(self._context.create_project(name))
@@ -104,6 +126,9 @@ def open(data_dir: os.PathLike[str] | str) -> Context:
 
 
 __all__ = [
+    "CONNECTION_RECORD_FIELDS",
+    "ConnectionCollection",
+    "ConnectionRecord",
     "CARD_METADATA_RECORD_FIELDS",
     "CARD_RECORD_FIELDS",
     "COMPLETE_CARD_RECORD_FIELDS",

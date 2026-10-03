@@ -56,8 +56,8 @@ It is returned by `cards.to_records(include_content=True)`. The earlier
 `CardRecord` name remains an alias of this complete contract, and
 `CARD_RECORD_FIELDS` remains an alias of `COMPLETE_CARD_RECORD_FIELDS`.
 
-`CardCollection` currently exports live cards. Tags, connections, milestones,
-and trashed cards are separate future record contracts rather than nested
+`CardCollection` currently exports live cards. Tags, milestones and
+trashed cards are separate future record contracts rather than nested
 columns in either card record contract.
 
 ## Extraction behavior and limitations
@@ -98,3 +98,54 @@ have no automatic write-back behavior. Editing one cannot modify Holder.
 Complete extraction retains the consistency limits above: each page is guarded
 by the process-local project lock, but a DataFrame assembled across pages or
 projects is not a transactionally consistent snapshot.
+
+## `ConnectionRecord`
+
+`context.connections.to_records(project_id=None)` exports explicit outgoing
+links from selected live source cards. Each link appears once, not again as a
+backlink. Core's automatic parent/children hierarchy and inline `[[wikilinks]]`
+are excluded. Identifiers retain core's names, including `to_card_id` for
+non-card targets; use `to_type` to distinguish those targets.
+
+| Field | Python type | Meaning |
+|---|---|---|
+| `project_id` | `str` | Source card's owning project |
+| `from_card_id` | `str` | Source card identifier |
+| `to_card_id` | `str` | Target identifier |
+| `to_type` | `str` | Core target type, such as `card` or `resource` |
+| `kind` | `str` | Relationship kind; custom kinds are allowed |
+| `label` | `str \| None` | Optional connection label |
+| `created_at` | `int` | Core timestamp in Unix seconds; core refreshes it on upsert |
+| `to_title` | `str \| None` | Resolved target card title, or `None` |
+
+Core has no separate connection ID. Identity is the tuple
+`(project_id, from_card_id, to_card_id, to_type, kind)`. Several kinds may connect
+the same ordered pair; reverse-direction links and self-links are distinct.
+`CONNECTION_RECORD_FIELDS` defines column order, including for empty exports.
+The pandas adapter uses nullable string columns and UTC timestamps with the
+same rules as the other tables. Join `from_card_id` to card records' `card_id`,
+and join card targets by `to_card_id` after selecting `to_type == "card"`.
+
+Extraction first selects card metadata and then calls `holder_card_list_links`
+once per source card. It does not read bodies or provide an atomic snapshot
+across cards/projects. Errors propagate instead of returning a partial list.
+Targets may be outside the selected project, unresolved, or trashed; target
+liveness is not guaranteed by this export. Records retain no context handles.
+
+## NetworkX conversion
+
+`Context.to_networkx()` uses the shared card and connection record contracts,
+with optional authoritative bodies via `include_content=True`. The output is a
+directed multigraph, preserving distinct connection kinds as edge keys, all
+selected cards including isolates, and the original record values as attributes.
+It reads connections for the same selected source-card records, without a
+second card selection. Extraction still spans separate core calls and has no
+whole-graph snapshot guarantee.
+
+Selected card nodes have `exported=True`. Referenced card targets lacking a
+selected record receive a minimal node containing `card_id`, core's nullable
+target title and `exported=False`. This preserves outgoing cross-project and
+unresolved connections without claiming complete metadata for those endpoints.
+Non-card connections are preserved by records/DataFrames but omitted from the
+card graph. Hierarchy remains a node attribute, not a fabricated explicit edge.
+All graph data is detached; mutation has no automatic write-back.
