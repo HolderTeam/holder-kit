@@ -220,6 +220,26 @@ with holder.open("./knowledge") as context:
     projects = context.projects.to_dataframe()
 ```
 
+Export related tables together with the same schemas:
+
+```python
+with holder.open("./knowledge") as context:
+    tables = context.to_dataframes(project_id=None, include_content=True)
+
+# All tables are detached and remain usable after the context closes.
+cards_with_projects = tables["cards"].merge(
+    tables["projects"][["project_id", "name"]], on="project_id"
+)
+```
+
+`to_dataframes()` returns a typed `DataFrames` dictionary containing `projects`,
+`cards` and `connections`. An optional project ID scopes the project row and
+source cards; outgoing connections to other projects remain in the connection
+table. Unknown IDs yield three empty tables with stable schemas. Card bodies
+are omitted by default. Extraction reuses one project selection and the same
+selected card records for connection reads, but separate core calls do not form
+an atomic snapshot. Errors propagate; no partial result is returned.
+
 The default card table is metadata-only and has no `content` column. Complete
 tables retain genuine empty bodies as empty strings. DataFrames are detached:
 editing them never writes to Holder.
@@ -282,7 +302,7 @@ remain in connection records/tables but are excluded from this card graph.
 Editing the graph or a connection table never writes back to Holder.
 
 See [Detached record contracts](docs/record-contracts.md) for schemas and limits.
-Combined `to_dataframes()`, milestones and tags remain subsequent slices.
+Milestones and tags remain subsequent slices.
 
 The base package has no data-science dependencies. The broader
 libholder API, concurrency support, stable-ABI wheels, public pip distribution, and Debian/Ubuntu `python3-holder`

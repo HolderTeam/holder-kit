@@ -149,3 +149,33 @@ unresolved connections without claiming complete metadata for those endpoints.
 Non-card connections are preserved by records/DataFrames but omitted from the
 card graph. Hierarchy remains a node attribute, not a fabricated explicit edge.
 All graph data is detached; mutation has no automatic write-back.
+
+## Combined DataFrames
+
+`Context.to_dataframes(project_id=None, include_content=False)` returns a
+`DataFrames` typed dictionary with exactly three named tables: `projects`,
+`cards` and `connections`. Each table uses its existing record-field constants,
+column order and pandas dtypes. The default cards table is metadata-only;
+`include_content=True` requests authoritative bodies through core's complete
+card pages. pandas remains optional and is checked before any extraction.
+
+The method selects projects once, extracts cards for those projects and reads
+outgoing connections for those same selected source-card records. It does not
+repeat card selection to assemble the connection table. With no project ID,
+all projects from that initial selection are exported. With an ID, only that
+project and its source cards are exported. An unknown project ID returns three
+empty tables with their full schemas; an existing empty project retains its
+project row and empty cards/connections tables.
+
+Join `cards.project_id` and `connections.project_id` to `projects.project_id`,
+and `connections.from_card_id` to `cards.card_id`. Outgoing targets can be
+outside the selected project, unresolved, trashed or non-card resources. Those
+connections are preserved without adding target cards/projects to the tables;
+filter `to_type == "card"` before joining `to_card_id` to exported card IDs and
+use a left join if you need to retain targets absent from that selection.
+
+The three tables are detached but **not an atomic snapshot**. Project reads,
+card pages and per-card connection reads are separate core operations. Changes
+can occur between them, and no export-wide transaction or lock is held. Core
+failures propagate rather than returning a partial dictionary. Tables remain
+usable after context closure, and editing any table never writes to Holder.
