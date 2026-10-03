@@ -16,12 +16,11 @@ with TemporaryDirectory(prefix="holder-graph-example-") as temporary:
         context.create_card(project.project_id, "Independent note")
         context.connections.add(second.card_id, first.card_id, "depends_on", "Evidence needed")
         context.connections.add(second.card_id, first.card_id, "references")
-        cards = context.cards.to_dataframe(project.project_id)
-        connections = context.connections.to_dataframe(project.project_id)
+        tables = context.to_dataframes(project.project_id)
         graph = context.to_networkx(project.project_id)
 
-    joined = connections.merge(
-        cards[["card_id", "title"]], left_on="from_card_id", right_on="card_id",
+    joined = tables["connections"].merge(
+        tables["cards"][["card_id", "title"]], left_on="from_card_id", right_on="card_id",
     )
     print(joined[["title", "kind", "to_title"]].to_string(index=False))
     print("Nodes:", graph.number_of_nodes(), "connections:", graph.number_of_edges())

@@ -4,10 +4,18 @@ from __future__ import annotations
 
 from importlib import import_module
 from types import ModuleType
-from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence, TypedDict, cast
 
 if TYPE_CHECKING:
     import pandas as pd
+
+
+class DataFrames(TypedDict):
+    """Named detached tables returned by Context.to_dataframes()."""
+
+    projects: pd.DataFrame
+    cards: pd.DataFrame
+    connections: pd.DataFrame
 
 
 _TIMESTAMP_FIELDS = frozenset({"created_at", "updated_at", "deleted_at"})
@@ -48,4 +56,4 @@ def records_to_dataframe(
     return cast("pd.DataFrame", frame)
 
 
-__all__ = ["records_to_dataframe"]
+__all__ = ["DataFrames", "records_to_dataframe"]

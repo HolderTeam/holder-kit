@@ -20,6 +20,7 @@ if sys.platform == "win32" and (Path(__file__).parent / ".libs").is_dir():
 from . import _native
 from .collections import CardCollection, ConnectionCollection, ProjectCollection
 from .graph import records_to_networkx
+from .dataframe import DataFrames, _require_pandas, records_to_dataframe
 from .data import (
     CARD_METADATA_RECORD_FIELDS,
     CARD_RECORD_FIELDS,
@@ -68,6 +69,33 @@ class Context:
     @property
     def connections(self) -> ConnectionCollection:
         return ConnectionCollection(self._context)
+
+    def to_dataframes(
+        self, project_id: str | None = None, *, include_content: bool = False,
+    ) -> DataFrames:
+        """Export detached projects/cards/connections tables, without atomicity.
+
+        Project selection applies to source cards; referenced targets can fall
+        outside the selected tables. Unknown project IDs yield empty tables.
+        """
+
+        _require_pandas()
+        projects = self.projects.to_records()
+        if project_id is not None:
+            projects = [record for record in projects if record["project_id"] == project_id]
+        cards: list[CardMetadataRecord] = []
+        for project in projects:
+            if include_content:
+                cards.extend(self.cards.to_records(project["project_id"], include_content=True))
+            else:
+                cards.extend(self.cards.to_records(project["project_id"]))
+        connections = self.connections._records_from_cards(cards)
+        card_fields = COMPLETE_CARD_RECORD_FIELDS if include_content else CARD_METADATA_RECORD_FIELDS
+        return {
+            "projects": records_to_dataframe(projects, PROJECT_RECORD_FIELDS),
+            "cards": records_to_dataframe(cards, card_fields),
+            "connections": records_to_dataframe(connections, CONNECTION_RECORD_FIELDS),
+        }
 
     def to_networkx(
         self, project_id: str | None = None, *, include_content: bool = False,
@@ -139,6 +167,7 @@ __all__ = [
     "CardRecord",
     "CompleteCardRecord",
     "Context",
+    "DataFrames",
     "HolderError",
     "Project",
     "ProjectCollection",

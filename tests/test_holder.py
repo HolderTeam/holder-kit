@@ -233,10 +233,14 @@ def test_metadata_records_do_not_require_card_files(tmp_path: Path) -> None:
             context.cards.to_records(project.project_id, include_content=True)
 
 
+@pytest.mark.parametrize("combined", [False, True])
 def test_dataframe_request_explains_optional_pandas_dependency(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, combined: bool,
 ) -> None:
     monkeypatch.setitem(sys.modules, "pandas", None)
     with holder.open(tmp_path / "holder-data") as context:
         with pytest.raises(ModuleNotFoundError, match=r"holder\[pandas\]"):
-            context.cards.to_dataframe()
+            if combined:
+                context.to_dataframes()
+            else:
+                context.cards.to_dataframe()
