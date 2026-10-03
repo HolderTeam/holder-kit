@@ -295,11 +295,11 @@ Context_list_links(ContextObject *self, PyObject *args, PyObject *kwargs)
     return json_from_native_string(output);
 }
 
-typedef int (*tag_json_operation)(holder_context *, const char *, char **, holder_error **);
+typedef int (*context_json_operation)(holder_context *, const char *, char **, holder_error **);
 
 static PyObject *
-tag_json_read(ContextObject *self, PyObject *args, PyObject *kwargs,
-              const char *argument, tag_json_operation operation)
+context_json_read(ContextObject *self, PyObject *args, PyObject *kwargs,
+                  const char *argument, context_json_operation operation)
 {
     const char *id = NULL;
     char *keywords[] = {(char *)argument, NULL};
@@ -322,19 +322,149 @@ tag_json_read(ContextObject *self, PyObject *args, PyObject *kwargs,
 static PyObject *
 Context_list_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
-    return tag_json_read(self, args, kwargs, "card_id", holder_card_list_tags);
+    return context_json_read(self, args, kwargs, "card_id", holder_card_list_tags);
 }
 
 static PyObject *
 Context_list_editable_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
-    return tag_json_read(self, args, kwargs, "card_id", holder_card_list_editable_tags);
+    return context_json_read(self, args, kwargs, "card_id", holder_card_list_editable_tags);
 }
 
 static PyObject *
 Context_list_project_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
-    return tag_json_read(self, args, kwargs, "project_id", holder_project_list_tags);
+    return context_json_read(self, args, kwargs, "project_id", holder_project_list_tags);
+}
+
+static PyObject *
+Context_list_milestones(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return context_json_read(self, args, kwargs, "card_id", holder_card_list_milestones);
+}
+
+static int
+epoch_seconds(PyObject *value, long long *output)
+{
+    if (!PyLong_Check(value) || PyBool_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "timestamp must be an integer Unix second");
+        return 0;
+    }
+    *output = PyLong_AsLongLong(value);
+    return !PyErr_Occurred();
+}
+
+static PyObject *
+Context_add_milestone(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *card_id = NULL;
+    PyObject *start_object = NULL;
+    PyObject *end_object = Py_None;
+    PyObject *all_day = Py_False;
+    const char *kind = NULL;
+    const char *description = NULL;
+    static char *keywords[] = {"card_id", "start_at", "end_at", "all_day", "kind", "description", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sO|OOzz:add_milestone", keywords,
+                                    &card_id, &start_object, &end_object, &all_day, &kind, &description) ||
+        !ensure_context_open(self)) {
+        return NULL;
+    }
+    long long start_at = 0;
+    long long end_at = 0;
+    if (!epoch_seconds(start_object, &start_at) ||
+        (end_object != Py_None && !epoch_seconds(end_object, &end_at))) {
+        return NULL;
+    }
+    if (!PyBool_Check(all_day)) {
+        PyErr_SetString(PyExc_TypeError, "all_day must be bool");
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_milestone_add(self->context, card_id, start_at,
+        end_object != Py_None, end_at, all_day == Py_True, kind, description, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
+Context_update_milestone(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *project_id = NULL;
+    const char *card_id = NULL;
+    const char *milestone_id = NULL;
+    const char *update_json = NULL;
+    static char *keywords[] = {"project_id", "card_id", "milestone_id", "update_json", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ssss:update_milestone", keywords,
+                                    &project_id, &card_id, &milestone_id, &update_json) ||
+        !ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_milestone_update_json(self->context, project_id,
+        card_id, milestone_id, update_json, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
+Context_remove_milestone(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *card_id = NULL;
+    const char *milestone_id = NULL;
+    static char *keywords[] = {"card_id", "milestone_id", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss:remove_milestone", keywords,
+                                    &card_id, &milestone_id) || !ensure_context_open(self)) {
+        return NULL;
+    }
+    holder_error *error = NULL;
+    const int result = holder_card_milestone_remove(self->context, card_id, milestone_id, &error);
+    if (result != HOLDER_OK) {
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+Context_milestones_in_range(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *project_id = NULL;
+    PyObject *from_object = NULL;
+    PyObject *to_object = NULL;
+    static char *keywords[] = {"project_id", "from_at", "to_at", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sOO:milestones_in_range", keywords,
+                                    &project_id, &from_object, &to_object) || !ensure_context_open(self)) {
+        return NULL;
+    }
+    long long from_at = 0;
+    long long to_at = 0;
+    if (!epoch_seconds(from_object, &from_at) || !epoch_seconds(to_object, &to_at)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_project_list_milestones_in_range(self->context, project_id,
+        from_at, to_at, &output, &error);
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
 }
 
 typedef int (*tag_mutation)(holder_context *, const char *, const char *, int *, holder_error **);
@@ -597,6 +727,16 @@ PyDoc_STRVAR(
 );
 
 static PyMethodDef Context_methods[] = {
+    {"list_milestones", PyCFunction_CAST(Context_list_milestones), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("List a card's milestones ordered by start time.")},
+    {"add_milestone", PyCFunction_CAST(Context_add_milestone), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("Add a milestone and return the updated milestone list.")},
+    {"update_milestone", PyCFunction_CAST(Context_update_milestone), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("Partially update an owned milestone using core's JSON contract.")},
+    {"remove_milestone", PyCFunction_CAST(Context_remove_milestone), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("Remove a milestone if it belongs to the given card.")},
+    {"milestones_in_range", PyCFunction_CAST(Context_milestones_in_range), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("List live project milestones starting in an inclusive time range.")},
     {"list_tags", PyCFunction_CAST(Context_list_tags), METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("List a card's normalized tags.")},
     {"list_editable_tags", PyCFunction_CAST(Context_list_editable_tags), METH_VARARGS | METH_KEYWORDS,

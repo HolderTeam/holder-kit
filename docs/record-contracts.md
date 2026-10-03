@@ -57,7 +57,7 @@ It is returned by `cards.to_records(include_content=True)`. The earlier
 `CARD_RECORD_FIELDS` remains an alias of `COMPLETE_CARD_RECORD_FIELDS`.
 
 `CardCollection` currently exports live cards. Tags have a separate membership
-contract below; milestones and trashed cards remain future contracts rather than nested
+contract below, as do milestones; trashed cards remain future contracts rather than nested
 columns in either card record contract.
 
 ## Extraction behavior and limitations
@@ -153,19 +153,19 @@ All graph data is detached; mutation has no automatic write-back.
 ## Combined DataFrames
 
 `Context.to_dataframes(project_id=None, include_content=False)` returns a
-`DataFrames` typed dictionary with four named tables: `projects`,
-`cards`, `connections` and `tags`. Each table uses its existing record-field constants,
+`DataFrames` typed dictionary with five named tables: `projects`,
+`cards`, `connections`, `tags` and `milestones`. Each table uses its existing record-field constants,
 column order and pandas dtypes. The default cards table is metadata-only;
 `include_content=True` requests authoritative bodies through core's complete
 card pages. pandas remains optional and is checked before any extraction.
 
 The method selects projects once, extracts cards for those projects and reads
-outgoing connections and tag memberships for those same selected source-card records. It does not
-repeat card selection to assemble either table. With no project ID,
+outgoing connections, tag memberships and milestones for those same selected source-card records. It does not
+repeat card selection to assemble these tables. With no project ID,
 all projects from that initial selection are exported. With an ID, only that
-project and its source cards are exported. An unknown project ID returns four
+project and its source cards are exported. An unknown project ID returns five
 empty tables with their full schemas; an existing empty project retains its
-project row and empty cards/connections/tags tables.
+project row and empty cards/connections/tags/milestones tables.
 
 Join `cards.project_id` and `connections.project_id` to `projects.project_id`,
 and `connections.from_card_id` to `cards.card_id`. Outgoing targets can be
@@ -175,7 +175,7 @@ filter `to_type == "card"` before joining `to_card_id` to exported card IDs and
 use a left join if you need to retain targets absent from that selection.
 
 The tables are detached but **not an atomic snapshot**. Project reads,
-card pages and per-card connection/tag reads are separate core operations. Changes
+card pages and per-card connection/tag/milestone reads are separate core operations. Changes
 can occur between them, and no export-wide transaction or lock is held. Core
 failures propagate rather than returning a partial dictionary. Tables remain
 usable after context closure, and editing any table never writes to Holder.
@@ -226,3 +226,87 @@ is missing. The flag can therefore be false in that situation despite an indexed
 tag remaining present. By contrast, `include_content=True` still uses complete
 card extraction, whose missing-body failure propagates. Native read failures
 propagate without returning partial exports; closed contexts raise `RuntimeError`.
+
+## Milestone records and operations
+
+`context.milestones.list(card_id)` returns detached `MilestoneRecord` dictionaries
+in core's ascending `start_at` order. `MILESTONE_RECORD_FIELDS` defines their schema:
+
+| Field | Python type | Meaning |
+|---|---|---|
+| `milestone_id` | `str` | Core-generated milestone UUID |
+| `card_id` | `str` | Owning card identifier |
+| `start_at` | `int` | Start time in Unix seconds |
+| `end_at` | `int \| None` | Optional end time; None denotes a point |
+| `all_day` | `bool` | Core's all-day flag; no Python timezone/date normalization |
+| `kind` | `str \| None` | Optional kind, including custom values |
+| `description` | `str \| None` | Optional description |
+| `created_at` | `int` | Core creation time in Unix seconds |
+| `updated_at` | `int` | Core last-update time in Unix seconds |
+
+`milestones.to_records(project_id=None)` selects live cards and reads their
+milestones once per card. It returns `ProjectMilestoneRecord` dictionaries adding
+`project_id` and `card_title` from the selected card metadata. Field order is
+`PROJECT_MILESTONE_RECORD_FIELDS`: `project_id`, the milestone fields above, then
+`card_title`. `milestones.in_range(project_id, from_at, to_at)` returns the same
+contract, with the project ID supplied by the query and nullable `card_title`
+resolved by core. It uses core's bulk calendar query and excludes trashed cards.
+Unknown projects and empty selections yield empty results.
+
+Range selection is `from_at <= start_at <= to_at`, **not interval overlap**.
+A span beginning before the range is omitted even if it ends inside it. Reversed
+query bounds return an empty list. Equal-start ordering is unspecified. Card-local
+lists are start-ordered; whole-context exports preserve selected card order, not
+a globally sorted calendar. Sort detached data explicitly when needed.
+
+`milestones.to_dataframe()` and the combined `milestones` table preserve that
+extended schema. IDs/text use nullable strings, `all_day` uses nullable `boolean`,
+and all four time columns use `datetime64[ns, UTC]`; `end_at=None` becomes `NaT`.
+Empty tables keep the same columns/dtypes. Join on `project_id` and `card_id` to
+cards. Timestamps outside pandas' nanosecond range can remain valid core/record
+values but cannot be represented by this DataFrame contract; conversion errors
+propagate rather than silently clipping or changing precision.
+
+### Explicit mutations and partial updates
+
+`milestones.add(card_id, start_at, *, end_at=None, all_day=False, kind=None,
+description=None)` returns the **full updated card milestone list**, not just the
+new row. Each addition gets a new core ID; repeating a successful add creates
+another milestone. Empty kind/description strings on add are normalized to None
+by core. `milestones.remove(card_id, milestone_id)` returns None; absent IDs and
+IDs owned by another card are no-ops, but an unknown card raises `HolderError`.
+
+`milestones.update(project_id, card_id, milestone_id, changes)` accepts a typed
+`MilestoneUpdate` dictionary and returns the single updated `MilestoneRecord`:
+
+- Absent fields stay unchanged; an empty dictionary is a no-op for an existing,
+  correctly owned live milestone.
+- `end_at`, `kind` and `description` accept None to clear their value.
+- `start_at` and `all_day` cannot be cleared; None raises `ValueError`.
+- Unknown keys raise `ValueError`. Times must be signed 64-bit integer Unix
+  seconds, not bool/float; flags must be bool; text must be str or None. Invalid
+  Python field types raise `TypeError`, out-of-range integers `OverflowError`.
+- Core verifies the matching project/card/milestone ownership and live-card
+  status. Mismatch raises `HolderError`. An update creating `end_at < start_at`
+  also raises `HolderError` through the current C ABI exception translation.
+
+Core owns durable front-matter editing, index updates and Git commits; Python
+does not parse or rewrite Markdown. Existing detached objects/records do not
+refresh automatically. Valid calls on a closed context raise `RuntimeError`.
+Failed reads abort exports without a partial result; no export-wide snapshot,
+transaction, revision check or bulk mutation guarantee is implied.
+
+### Current core limitations
+
+The public add operation does not enforce the update operation's reversed-span
+validation. Direct card-list/add/remove operations also do not expose the same
+explicit live-card ownership check as update and the calendar query; use selected
+live cards. Python preserves these contracts rather than duplicating domain policy.
+
+Add/remove replace index rows before attempting their durable card-file write.
+A missing file or another durable-write failure can therefore raise an error
+after index changes already occurred. Update checks/reads the file before changing
+the index, but none of these APIs promises an atomic multi-store transaction or
+automatic rollback on every failure. Do not blindly retry failed additions or
+infer unchanged storage from an exception. Strengthening this behavior requires
+an owning core change, not a Python-only transaction wrapper.
