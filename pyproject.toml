@@ -29,4 +29,4 @@ testpaths = ["tests"]
 
 [tool.mypy]
 strict = true
-files = ["src/holder", "examples", "tests"]
+files = ["src/holder", "examples", "tests", "scripts/develop.py"]

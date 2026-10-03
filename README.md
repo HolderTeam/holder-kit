@@ -7,12 +7,14 @@ and optional pandas and NetworkX exports.
 
 The compiled extension is `holder._native`. The `holder` package supplies the
 small public wrapper and loads the database schema shipped from the selected
-`holder-core` SDK. It does not communicate with `holderd` and does not
+core source revision or SDK. It does not communicate with `holderd` and does not
 implement a REST or command-line wrapper.
 
 ## Build from source
 
-The Bash developer entry point follows the other Holder repositories:
+The Bash developer entry point follows the other Holder repositories. It calls
+the standard-library Python helper in `scripts/develop.py`, so you can normally
+check out this repository and run `./make.sh` on Linux, macOS or BSD:
 
 ```sh
 ./make.sh --help                 # also accepts help and -h
@@ -23,24 +25,67 @@ The Bash developer entry point follows the other Holder repositories:
 ./make.sh wheel Release          # wheel in out/make/wheels
 ```
 
+The default is a **local core source build**, using the first applicable location:
+
+1. An explicit `HOLDER_PYTHON_CORE_SOURCE` path.
+2. A sibling `../holder-core` checkout.
+3. A managed `build/deps/holder-core` checkout.
+
+If core is missing, the script stops before creating a virtualenv or installing
+Python packages and prints two ways to provide it:
+
+```sh
+git clone https://github.com/HolderTeam/holder-core.git ../holder-core
+# Or let the script prepare the recorded tested revision:
+./make.sh setup-core
+
+./make.sh
+```
+
+`setup-core` fetches the full commit recorded in `core-source.json` from the
+official core repository into a temporary directory, verifies it, and moves the
+completed checkout into `build/deps/holder-core`. It requires Git and network
+access. It is idempotent for a clean matching checkout and refuses to overwrite
+or update an existing divergent checkout. No submodule is involved.
+
+Sibling and explicit source checkouts belong to the developer: builds never
+switch branches, pull, reset or otherwise change their files. The selected
+revision and working-tree status are printed; a different or modified developer
+checkout may be used without claiming it matches the recorded tested revision.
+Automatically discovered managed checkouts must match the recorded commit.
+The chosen source revision is also recorded in `out/make/core-source.json`.
+
+Before installing Python packages, the source workflow checks basic tools and
+Python headers, then configures core with `BUILD_TESTING=OFF` to check native
+prerequisites. Core's CMake configuration and README remain authoritative for
+the native dependency set. Failures point to the exact core README and the
+missing tool/dependency reported above. macOS builds discover an installed
+Homebrew prefix and its OpenSSL prefixes; BSD users should install development
+packages using their platform's ports/package manager. The script does not
+install system packages or invoke sudo.
+
 The script uses its own repository directory even when called from elsewhere,
 and invokes `.venv` directly; shell activation is optional. `build` and `setup`
 both install the editable package and test extras, including pandas and NetworkX.
 Use `./make.sh test -k connections` to pass pytest arguments, and
 `./make.sh typecheck` to check the installed development package without rebuilding.
 `./make.sh clean` removes only script-owned `build/make` and `out/make` output;
-it retains `.venv`, the SDK cache and other build directories.
+it retains `.venv`, the managed core checkout, the SDK cache and other build directories.
 
-Normal builds use the shared SDK tool described below, reusing the saved core
-selection. `./make.sh sdk <tag-or-full-SHA>` selects a new pin; `./make.sh sdk`
-selects latest-green. Set `HOLDER_CORE_REF` to select explicitly during a build,
-or `HOLDER_CORE_SDK` to reuse an already prepared SDK. For local core development
-(including distributions with a different dependency ABI), opt into a source build:
+Published SDK builds are an explicit alternative, using the shared SDK tool
+described below and reusing its saved selection:
 
 ```sh
-HOLDER_PYTHON_CORE_SOURCE=../holder-core ./make.sh check
-HOLDER_PYTHON_CORE_SOURCE=../holder-core ./make.sh build Debug
+./make.sh --sdk check
+./make.sh --sdk wheel Release
+./make.sh sdk <tag-or-full-SHA>
 ```
+
+`sdk` selects/fetches an SDK; use `--sdk` on subsequent builds to select that
+workflow. Setting `HOLDER_CORE_REF` or `HOLDER_CORE_SDK` also explicitly selects
+SDK builds unless an explicit source path is provided. `--sdk` combined with an
+explicit source path is rejected. SDK dependency ABI limitations still apply;
+there is no silent fallback from failed SDK builds to source builds.
 
 `HOLDER_PYTHON` selects the interpreter used to create a new venv;
 `HOLDER_PYTHON_VENV` selects its path. Build types have separate native build
@@ -48,7 +93,7 @@ directories, as do SDK and source builds. See help for the remaining commands
 and environment options. Platform/compiler dependencies still need to be
 installed as described below.
 
-Development builds use the latest green core SDK. CI resolves it once per run
+CI uses the latest green core SDK unless pinned. It resolves it once per run
 and uses the same exact core commit on Linux, macOS, and Windows. An explicit
 version tag or full commit SHA pins a Framework RC or release.
 
@@ -65,7 +110,7 @@ python -m pip install -e .
 ```
 
 The local `scripts/core-sdk.py` command delegates to the shared tool in the
-sibling core checkout. `HOLDER_CORE_SDK_TOOL` can select another checkout's
+sibling or managed core checkout. `HOLDER_CORE_SDK_TOOL` can select another checkout's
 `scripts/core-sdk.py`. CI calls core's shared action directly, so SDK selection
 and validation have one implementation owned and tested by core.
 
@@ -95,8 +140,8 @@ Windows runtime DLLs and their license notices are installed beside the extensio
 Installed SDK builds include `holder/_core_build.json` with the exact core commit,
 version, platform, build configuration, and compiler, plus the matching schema.
 
-For explicit core source development, clone `holder-core` beside this repository
-and pass its absolute path to pip:
+For a manual source build without `make.sh`, clone `holder-core` beside this
+repository and pass its absolute path to pip:
 
 ```sh
 python -m pip install -e . \
