@@ -4,8 +4,14 @@
 import os
 from pathlib import Path
 import runpy
+import sys
 
-path = Path(os.environ.get("HOLDER_CORE_SDK_TOOL", Path(__file__).parents[2] / "holder-core/scripts/core-sdk.py"))
-if not path.is_file():
-    raise SystemExit("Clone holder-core beside holder-python, or set HOLDER_CORE_SDK_TOOL to its scripts/core-sdk.py")
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.develop import AdviceError, Developer, ROOT
+
+try:
+    path = Developer(ROOT, os.environ).sdk_tool()
+except AdviceError as error:
+    raise SystemExit(str(error)) from error
 runpy.run_path(str(path), run_name="__main__")
