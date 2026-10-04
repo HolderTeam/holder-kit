@@ -16,7 +16,7 @@ pandas = ["pandas", "pandas-stubs"]
 graph = ["networkx", "types-networkx"]
 
 [project.urls]
-Repository = "https://github.com/HolderTeam/holder-python"
+Repository = "https://github.com/HolderTeam/holder-kit"
 
 [tool.scikit-build]
 cmake.version = ">=3.22"

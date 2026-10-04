@@ -35,8 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          repository: HolderTeam/holder-python
-          ref: ${{ github.repository == 'HolderTeam/holder-python' && github.sha || inputs.python_ref || 'main' }}
+          repository: HolderTeam/holder-kit
+          ref: ${{ github.repository == 'HolderTeam/holder-kit' && github.sha || inputs.python_ref || 'main' }}
           persist-credentials: false
       - id: source
         name: Record Python source revision
@@ -77,7 +77,7 @@ jobs:
       - name: Check out Holder Kit
         uses: actions/checkout@v7
         with:
-          repository: HolderTeam/holder-python
+          repository: HolderTeam/holder-kit
           ref: ${{ needs.core-sdk.outputs.python_commit }}
           persist-credentials: false
 
@@ -242,7 +242,7 @@ jobs:
       - name: Check out Holder Kit
         uses: actions/checkout@v7
         with:
-          repository: HolderTeam/holder-python
+          repository: HolderTeam/holder-kit
           ref: ${{ needs.core-sdk.outputs.python_commit }}
           persist-credentials: false
 
@@ -293,7 +293,7 @@ jobs:
       - name: Check out Holder Kit
         uses: actions/checkout@v7
         with:
-          repository: HolderTeam/holder-python
+          repository: HolderTeam/holder-kit
           ref: ${{ needs.core-sdk.outputs.python_commit }}
           persist-credentials: false
 
