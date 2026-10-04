@@ -21,9 +21,9 @@ In an existing environment, uninstall the former `holder` distribution before
 installing the renamed wheel or checkout. The public methods, record contracts
 and optional dependencies are unchanged.
 
-The intended repository name is `holder-kit`. Until the separate GitHub rename,
-source URLs, clone commands and CI checkout references continue to use
-`HolderTeam/holder-python`. The local checkout directory need not be renamed.
+The repository is `HolderTeam/holder-kit`. Source URLs, clone commands and CI
+checkout references use this name. The local checkout directory need not be
+renamed.
 The existing `HOLDER_PYTHON*` developer environment variables and CMake options
 remain available; they configure the Python build. Upstream libholder names,
 SDK paths and durable project formats retain their existing names.
@@ -118,9 +118,9 @@ and uses the same exact core commit on Linux, macOS, and Windows. An explicit
 version tag or full commit SHA pins a Framework RC or release.
 
 ```console
-git clone https://github.com/HolderTeam/holder-python.git
+git clone https://github.com/HolderTeam/holder-kit.git
 git clone https://github.com/HolderTeam/holder-core.git
-cd holder-python
+cd holder-kit
 python3 -m venv .venv
 source .venv/bin/activate
 python scripts/core-sdk.py resolve
