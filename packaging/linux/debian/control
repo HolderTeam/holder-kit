@@ -1,0 +1,25 @@
+Source: holder-kit
+Section: python
+Priority: optional
+Maintainer: Holder Team <holdercardteam@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+ cmake,
+ ninja-build,
+ dh-python,
+ python3-dev,
+ python3-pytest,
+ python3-pandas,
+ python3-networkx,
+ libholder-dev (>= 0.2.0)
+Standards-Version: 4.6.2
+Homepage: https://holder.team/
+Rules-Requires-Root: no
+
+Package: python3-holder-kit
+Architecture: any
+Depends: ${python3:Depends}, ${shlibs:Depends}, ${misc:Depends}
+Suggests: python3-pandas, python3-networkx
+Description: Python bindings for the Holder core library
+ Embed Holder projects, cards and connections directly in Python applications.
+ Includes typed detached records and optional pandas and NetworkX adapters.
+ Uses the system libholder shared library, with no running daemon required.

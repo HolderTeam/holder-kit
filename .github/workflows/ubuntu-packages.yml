@@ -1,0 +1,47 @@
+name: Holder Kit Ubuntu packages
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - series: noble
+            image: ubuntu:24.04
+          - series: resolute
+            image: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build and test against the series core package
+        env:
+          UBUNTU_IMAGE: ${{ matrix.image }}
+          SERIES: ${{ matrix.series }}
+        run: |
+          mkdir -p out/packages
+          docker run --rm -v "$PWD:/source:ro" -v "$PWD/out/packages:/out" \
+            "$UBUNTU_IMAGE" bash /source/scripts/ubuntu-package-ci.sh build "$SERIES"
+      - name: Install and test in a clean runtime container
+        env:
+          UBUNTU_IMAGE: ${{ matrix.image }}
+          SERIES: ${{ matrix.series }}
+        run: |
+          docker run --rm -v "$PWD:/source:ro" -v "$PWD/out/packages:/out:ro" \
+            "$UBUNTU_IMAGE" bash /source/scripts/ubuntu-package-ci.sh install "$SERIES"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python3-holder-kit-${{ matrix.series }}
+          path: out/packages/*
+          if-no-files-found: error
+          retention-days: 7
