@@ -6,7 +6,7 @@ on:
       version:
         description: Expected pyproject.toml version
         required: true
-        default: '0.2.0'
+        default: '0.0.1'
       package_revision:
         description: Debian revision (increment for each replacement upload)
         required: true

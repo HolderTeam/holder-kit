@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "holder-kit"
-version = "0.2.0"
+version = "0.0.1"
 description = "Holder Kit: CPython bindings for embedded libholder"
 readme = "README.md"
 requires-python = ">=3.10"

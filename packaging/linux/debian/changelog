@@ -1,5 +1,6 @@
-holder-kit (0.2.0-1) unstable; urgency=medium
+holder-kit (0.0.1-1) unstable; urgency=medium
 
   * Package Python bindings against the system libholder shared library.
+  * Use an independent initial version for early Holder Kit development.
 
  -- Holder Team <holdercardteam@gmail.com>  Sat, 03 Oct 2026 18:00:00 +0000

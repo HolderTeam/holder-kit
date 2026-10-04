@@ -5,6 +5,9 @@ a Python process. It offers a small typed interface for projects, cards and
 explicit connections, tags and milestones, including detached dataclasses, plain dictionary records,
 and optional pandas and NetworkX exports.
 
+Kit is in early development. Its initial package version is `0.0.1`, versioned
+independently of the core library and the Holder Framework.
+
 The compiled extension is `holderkit._native`. The `holderkit` package supplies the
 small public wrapper and loads the database schema shipped from the selected
 core source revision or SDK. It does not communicate with `holderd` and does not
