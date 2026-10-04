@@ -6,8 +6,8 @@ from typing import Any
 import pandas as pd
 import pytest
 
-import holder
-from holder import _native
+import holderkit
+from holderkit import _native
 
 
 CARD_METADATA_DTYPES = {
@@ -37,7 +37,7 @@ PROJECT_DTYPES = {
 
 CONNECTION_DTYPES = {
     field: "datetime64[ns, UTC]" if field == "created_at" else "string"
-    for field in holder.CONNECTION_RECORD_FIELDS
+    for field in holderkit.CONNECTION_RECORD_FIELDS
 }
 
 
@@ -48,26 +48,26 @@ def _dtypes(frame: pd.DataFrame) -> dict[str, str]:
 def test_empty_dataframes_preserve_contract_columns_and_dtypes(
     tmp_path: Path,
 ) -> None:
-    with holder.open(tmp_path / "holder-data") as context:
+    with holderkit.open(tmp_path / "holder-data") as context:
         cards = context.cards.to_dataframe()
         complete = context.cards.to_dataframe(include_content=True)
         projects = context.projects.to_dataframe()
 
-    assert list(cards.columns) == list(holder.CARD_METADATA_RECORD_FIELDS)
+    assert list(cards.columns) == list(holderkit.CARD_METADATA_RECORD_FIELDS)
     assert _dtypes(cards) == CARD_METADATA_DTYPES
-    assert list(complete.columns) == list(holder.COMPLETE_CARD_RECORD_FIELDS)
+    assert list(complete.columns) == list(holderkit.COMPLETE_CARD_RECORD_FIELDS)
     assert _dtypes(complete) == {
         **CARD_METADATA_DTYPES,
         "content": "string",
     }
-    assert list(projects.columns) == list(holder.PROJECT_RECORD_FIELDS)
+    assert list(projects.columns) == list(holderkit.PROJECT_RECORD_FIELDS)
     assert _dtypes(projects) == PROJECT_DTYPES
 
 
 def test_card_dataframes_distinguish_unrequested_and_empty_content(
     tmp_path: Path,
 ) -> None:
-    with holder.open(tmp_path / "holder-data") as context:
+    with holderkit.open(tmp_path / "holder-data") as context:
         project = context.create_project("DataFrames")
         empty = context.create_card(project.project_id, "Empty body", "")
         parent = context.create_card(project.project_id, "Parent", "parent body")
@@ -108,7 +108,7 @@ def test_dataframes_are_detached_and_have_no_implicit_writeback(
     tmp_path: Path,
 ) -> None:
     data_dir = tmp_path / "holder-data"
-    context = holder.open(data_dir)
+    context = holderkit.open(data_dir)
     project = context.create_project("Detached")
     card = context.create_card(project.project_id, "Original", "source body")
     frame = context.cards.to_dataframe(include_content=True)
@@ -118,7 +118,7 @@ def test_dataframes_are_detached_and_have_no_implicit_writeback(
     frame.loc[frame["card_id"] == card.card_id, "content"] = "local edit"
     assert frame.iloc[0]["title"] == "Edited in pandas"
 
-    with holder.open(data_dir) as reopened:
+    with holderkit.open(data_dir) as reopened:
         persisted = reopened.cards.to_dataframe(include_content=True)
 
     assert persisted.iloc[0]["title"] == "Original"
@@ -128,7 +128,7 @@ def test_dataframes_are_detached_and_have_no_implicit_writeback(
 def test_default_card_dataframe_does_not_read_authoritative_bodies(
     tmp_path: Path,
 ) -> None:
-    with holder.open(tmp_path / "holder-data") as context:
+    with holderkit.open(tmp_path / "holder-data") as context:
         project = context.create_project("Metadata only")
         card = context.create_card(project.project_id, "Missing file", "body")
         (Path(project.root_path) / card.rel_path).unlink()
@@ -137,7 +137,7 @@ def test_default_card_dataframe_does_not_read_authoritative_bodies(
         assert metadata.iloc[0]["card_id"] == card.card_id
         assert "content" not in metadata.columns
 
-        with pytest.raises(holder.HolderError, match="card content missing"):
+        with pytest.raises(holderkit.HolderError, match="card content missing"):
             context.cards.to_dataframe(project.project_id, include_content=True)
 
 
@@ -146,21 +146,21 @@ def test_default_card_dataframe_does_not_read_authoritative_bodies(
 def test_empty_combined_exports_preserve_all_schemas(
     tmp_path: Path, project_id: str | None, include_content: bool,
 ) -> None:
-    with holder.open(tmp_path / "data") as context:
-        tables: holder.DataFrames = context.to_dataframes(project_id, include_content=include_content)
+    with holderkit.open(tmp_path / "data") as context:
+        tables: holderkit.DataFrames = context.to_dataframes(project_id, include_content=include_content)
     assert list(tables) == ["projects", "cards", "connections", "tags", "milestones"]
-    assert list(tables["milestones"].columns) == list(holder.PROJECT_MILESTONE_RECORD_FIELDS)
+    assert list(tables["milestones"].columns) == list(holderkit.PROJECT_MILESTONE_RECORD_FIELDS)
     assert tables["milestones"].empty
-    assert list(tables["tags"].columns) == list(holder.TAG_RECORD_FIELDS)
+    assert list(tables["tags"].columns) == list(holderkit.TAG_RECORD_FIELDS)
     assert tables["tags"].empty
     expected_card_dtypes = dict(CARD_METADATA_DTYPES)
     if include_content:
         expected_card_dtypes["content"] = "string"
-    assert list(tables["projects"].columns) == list(holder.PROJECT_RECORD_FIELDS)
+    assert list(tables["projects"].columns) == list(holderkit.PROJECT_RECORD_FIELDS)
     assert list(tables["cards"].columns) == list(
-        holder.COMPLETE_CARD_RECORD_FIELDS if include_content else holder.CARD_METADATA_RECORD_FIELDS
+        holderkit.COMPLETE_CARD_RECORD_FIELDS if include_content else holderkit.CARD_METADATA_RECORD_FIELDS
     )
-    assert list(tables["connections"].columns) == list(holder.CONNECTION_RECORD_FIELDS)
+    assert list(tables["connections"].columns) == list(holderkit.CONNECTION_RECORD_FIELDS)
     assert _dtypes(tables["projects"]) == PROJECT_DTYPES
     assert _dtypes(tables["cards"]) == expected_card_dtypes
     assert _dtypes(tables["connections"]) == CONNECTION_DTYPES
@@ -169,7 +169,7 @@ def test_empty_combined_exports_preserve_all_schemas(
 
 def test_combined_exports_match_collection_tables_and_join_after_close(tmp_path: Path) -> None:
     data = tmp_path / "data"
-    with holder.open(data) as context:
+    with holderkit.open(data) as context:
         first = context.create_project("First")
         second = context.create_project("Second")
         source = context.create_card(first.project_id, "Source", "body")
@@ -189,14 +189,14 @@ def test_combined_exports_match_collection_tables_and_join_after_close(tmp_path:
     tables["cards"].loc[tables["cards"]["card_id"] == source.card_id, "content"] = "local edit"
     tables["connections"].loc[:, "kind"] = "local kind"
     tables["projects"].loc[:, "name"] = "local name"
-    with holder.open(data) as reopened:
+    with holderkit.open(data) as reopened:
         assert reopened.get_card_content(source.card_id) == "body"
         assert reopened.connections.to_records()[0]["kind"] == "references"
         assert {project.name for project in reopened.list_projects()} == {"First", "Second"}
 
 
 def test_combined_project_scope_preserves_external_targets(tmp_path: Path) -> None:
-    with holder.open(tmp_path / "data") as context:
+    with holderkit.open(tmp_path / "data") as context:
         first = context.create_project("First")
         second = context.create_project("Second")
         empty = context.create_project("Empty")
@@ -220,7 +220,7 @@ def test_combined_project_scope_preserves_external_targets(tmp_path: Path) -> No
 def test_combined_export_reuses_card_selection_during_later_changes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with holder.open(tmp_path / "data") as context:
+    with holderkit.open(tmp_path / "data") as context:
         project = context.create_project("Selection")
         original_card = context.create_card(project.project_id, "Original")
         list_cards = _native.Context.list_cards
@@ -241,12 +241,12 @@ def test_combined_export_reuses_card_selection_during_later_changes(
 
 
 def test_combined_export_content_failures_and_closed_context(tmp_path: Path) -> None:
-    with holder.open(tmp_path / "data") as context:
+    with holderkit.open(tmp_path / "data") as context:
         project = context.create_project("Missing body")
         card = context.create_card(project.project_id, "Card", "body")
         (Path(project.root_path) / card.rel_path).unlink()
         assert "content" not in context.to_dataframes()["cards"].columns
-        with pytest.raises(holder.HolderError, match="card content missing"):
+        with pytest.raises(holderkit.HolderError, match="card content missing"):
             context.to_dataframes(include_content=True)
     with pytest.raises(RuntimeError, match="closed"):
         context.to_dataframes()

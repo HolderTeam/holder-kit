@@ -5,12 +5,12 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-import holder
+import holderkit
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="holder-python-pandas-") as temporary:
-        with holder.open(Path(temporary) / "data") as context:
+    with tempfile.TemporaryDirectory(prefix="holder-kit-pandas-") as temporary:
+        with holderkit.open(Path(temporary) / "data") as context:
             research = context.create_project("Research")
             journal = context.create_project("Journal")
             notes = context.create_card(research.project_id, "Pandas notes", "tabular data")

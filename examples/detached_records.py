@@ -6,11 +6,11 @@ import json
 import tempfile
 from pathlib import Path
 
-from holder import Context
+from holderkit import Context
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="holder-python-records-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="holder-kit-records-") as temporary:
         with Context(Path(temporary) / "data") as context:
             project = context.create_project("Detached records")
             context.create_card(project.project_id, "First", "A complete body")

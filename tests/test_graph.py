@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-import holder
-from holder.graph import records_to_networkx
+import holderkit
+from holderkit.graph import records_to_networkx
 
 
 def test_graph_preserves_direction_parallel_edges_isolates_and_detachment(tmp_path: Path) -> None:
     nx = pytest.importorskip("networkx")
     data = tmp_path / "data"
-    with holder.open(data) as context:
+    with holderkit.open(data) as context:
         project = context.create_project("Graph")
         source = context.create_card(project.project_id, "Source", "body")
         target = context.create_card(project.project_id, "Target", parent_card_id=source.card_id)
@@ -33,7 +33,7 @@ def test_graph_preserves_direction_parallel_edges_isolates_and_detachment(tmp_pa
     assert graph.nodes[target.card_id]["parent_card_id"] == source.card_id
     graph.nodes[source.card_id]["title"] = "local change"
     graph.remove_edge(source.card_id, target.card_id, "depends_on")
-    with holder.open(data) as context:
+    with holderkit.open(data) as context:
         persisted = context.to_networkx()
         assert persisted.nodes[source.card_id]["title"] == "Source"
         assert persisted.number_of_edges() == 4
@@ -41,7 +41,7 @@ def test_graph_preserves_direction_parallel_edges_isolates_and_detachment(tmp_pa
 
 def test_empty_and_project_scoped_graph(tmp_path: Path) -> None:
     pytest.importorskip("networkx")
-    with holder.open(tmp_path / "data") as context:
+    with holderkit.open(tmp_path / "data") as context:
         assert len(context.to_networkx()) == 0
         first = context.create_project("First")
         second = context.create_project("Second")
@@ -62,23 +62,23 @@ def test_empty_and_project_scoped_graph(tmp_path: Path) -> None:
 
 def test_optional_networkx_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "networkx", None)
-    with holder.open(tmp_path / "data") as context:
-        with pytest.raises(ModuleNotFoundError, match=r"holder\[graph\]"):
+    with holderkit.open(tmp_path / "data") as context:
+        with pytest.raises(ModuleNotFoundError, match=r"holder-kit\[graph\]"):
             context.to_networkx()
 
 
 def test_unresolved_card_and_non_card_targets_in_detached_records(tmp_path: Path) -> None:
     pytest.importorskip("networkx")
-    with holder.open(tmp_path / "data") as context:
+    with holderkit.open(tmp_path / "data") as context:
         project = context.create_project("Detached adapters")
         source = context.create_card(project.project_id, "Source")
         cards = context.cards.to_records()
-    unresolved: holder.ConnectionRecord = {
+    unresolved: holderkit.ConnectionRecord = {
         "project_id": project.project_id, "from_card_id": source.card_id,
         "to_card_id": "unknown-card", "to_type": "card", "kind": "references",
         "label": None, "created_at": source.created_at, "to_title": None,
     }
-    resource: holder.ConnectionRecord = {
+    resource: holderkit.ConnectionRecord = {
         **unresolved, "to_card_id": "resource-id", "to_type": "resource",
         "kind": "attachment",
     }
@@ -92,11 +92,11 @@ def test_unresolved_card_and_non_card_targets_in_detached_records(tmp_path: Path
 
 def test_metadata_graph_does_not_require_card_bodies(tmp_path: Path) -> None:
     pytest.importorskip("networkx")
-    with holder.open(tmp_path / "data") as context:
+    with holderkit.open(tmp_path / "data") as context:
         project = context.create_project("Metadata graph")
         card = context.create_card(project.project_id, "Missing body", "body")
         (Path(project.root_path) / card.rel_path).unlink()
         graph = context.to_networkx()
         assert graph.nodes[card.card_id]["title"] == "Missing body"
-        with pytest.raises(holder.HolderError, match="card content missing"):
+        with pytest.raises(holderkit.HolderError, match="card content missing"):
             context.to_networkx(include_content=True)

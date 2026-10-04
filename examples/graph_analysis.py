@@ -5,11 +5,11 @@ from tempfile import TemporaryDirectory
 
 import networkx as nx
 
-import holder
+import holderkit
 
 
 with TemporaryDirectory(prefix="holder-graph-example-") as temporary:
-    with holder.open(Path(temporary) / "data") as context:
+    with holderkit.open(Path(temporary) / "data") as context:
         project = context.create_project("Demo")
         first = context.create_card(project.project_id, "Collect evidence")
         second = context.create_card(project.project_id, "Write report")

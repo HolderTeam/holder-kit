@@ -1,6 +1,6 @@
 # Detached record contracts
 
-Holder record exports are plain dictionaries with stable field names and
+Holder Kit record exports are plain dictionaries with stable field names and
 standard-library types. They own no native resources and remain readable,
 serialisable, and safe to pass elsewhere after their originating `Context` is
 closed.

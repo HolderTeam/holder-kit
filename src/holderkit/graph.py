@@ -23,7 +23,7 @@ def records_to_networkx(
         if error.name != "networkx":
             raise
         raise ModuleNotFoundError(
-            'networkx is required for graph support; install "holder[graph]" '
+            'networkx is required for graph support; install "holder-kit[graph]" '
             'or "pip install -e \'.[graph]\'" from a source checkout'
         ) from None
 

@@ -74,7 +74,7 @@ jobs:
             sanitized: true
 
     steps:
-      - name: Check out holder-python
+      - name: Check out Holder Kit
         uses: actions/checkout@v7
         with:
           repository: HolderTeam/holder-python
@@ -119,11 +119,11 @@ jobs:
       - name: Install packaging tools
         run: python3 -m pip install --upgrade pip
 
-      - name: Build and install holder-python with complete test dependencies
+      - name: Build and install Holder Kit with complete test dependencies
         if: ${{ matrix.comprehensive }}
         run: python3 -m pip install --verbose '.[test]'
 
-      - name: Build instrumented holder-python for lifecycle smoke tests
+      - name: Build instrumented Holder Kit for lifecycle smoke tests
         if: ${{ matrix.sanitized }}
         run: python3 -m pip install --verbose --config-settings=cmake.define.HOLDER_PYTHON_SANITIZE=address,undefined . 'pytest>=8'
 
@@ -143,8 +143,8 @@ jobs:
         run: |
           python3 --version
           python3 -c 'import sys; print(sys.executable)'
-          python3 -m pip show holder
-          python3 -c 'import holder; print(holder.__file__)'
+          python3 -m pip show holder-kit
+          python3 -c 'import holderkit; print(holderkit.__file__)'
 
       - name: Run instrumented Python lifecycle smoke tests
         if: ${{ matrix.sanitized }}
@@ -190,17 +190,34 @@ jobs:
         run: |
           "${RUNNER_TEMP}/holder-wheel-venv/bin/python" - <<'PY'
           import importlib.util
+          import json
+          from importlib.metadata import distribution
+          from importlib.resources import files
           import sys
           import tempfile
           from pathlib import Path
 
           assert importlib.util.find_spec("pandas") is None
 
-          import holder
+          import holderkit
+          from holderkit import _native
+
+          installed = distribution("holder-kit")
+          assert installed.metadata["Name"] == "holder-kit"
+          assert installed.files is not None
+          assert all(path.parts[0] != "holder" for path in installed.files)
+          assert importlib.util.find_spec("holder") is None
+          assert _native.__name__ == "holderkit._native"
+          assert _native.Context.__module__ == "holderkit._native"
+          assert holderkit.HolderError.__module__ == "holderkit._native"
+          resources = files("holderkit")
+          assert resources.joinpath("py.typed").is_file()
+          assert resources.joinpath("_schema.sql").read_text(encoding="utf-8")
+          assert json.loads(resources.joinpath("_core_build.json").read_text(encoding="utf-8"))
 
           assert "pandas" not in sys.modules
           with tempfile.TemporaryDirectory(prefix="holder-wheel-smoke-") as temporary:
-              with holder.open(Path(temporary) / "data") as context:
+              with holderkit.open(Path(temporary) / "data") as context:
                   project = context.create_project("Wheel smoke test")
                   card = context.create_card(
                       project.project_id, "Installed wheel", "standalone body"
@@ -210,7 +227,7 @@ jobs:
                   try:
                       context.cards.to_dataframe(project.project_id)
                   except ModuleNotFoundError as error:
-                      assert "holder[pandas]" in str(error)
+                      assert "holder-kit[pandas]" in str(error)
                   else:
                       raise AssertionError("base wheel unexpectedly provided pandas")
           PY
@@ -222,7 +239,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Check out holder-python
+      - name: Check out Holder Kit
         uses: actions/checkout@v7
         with:
           repository: HolderTeam/holder-python
@@ -254,7 +271,7 @@ jobs:
             md4c \
             openssl@3
 
-      - name: Build and install holder-python
+      - name: Build and install Holder Kit
         run: |
           python3 -m pip install --upgrade pip
           CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_PREFIX_PATH=$(brew --prefix);$(brew --prefix openssl@3) -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" \
@@ -273,7 +290,7 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Check out holder-python
+      - name: Check out Holder Kit
         uses: actions/checkout@v7
         with:
           repository: HolderTeam/holder-python
@@ -293,13 +310,13 @@ jobs:
         with:
           commit: ${{ needs.core-sdk.outputs.commit }}
 
-      - name: Build and install holder-python
+      - name: Build and install Holder Kit
         run: |
           python -m pip install --upgrade pip
           python -m pip install --verbose . "pytest>=8"
 
       - name: Verify native extension and bundled runtime dependencies
-        run: python -c "import holder; print(holder.__file__)"
+        run: python -c "import holderkit; print(holderkit.__file__)"
 
       - name: Run base Python tests
         run: python -m pytest --verbose tests/test_holder.py

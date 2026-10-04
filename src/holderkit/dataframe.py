@@ -32,7 +32,7 @@ def _require_pandas() -> ModuleType:
             raise
         raise ModuleNotFoundError(
             "pandas is required for DataFrame support; install it with "
-            '"pip install holder[pandas]" (or "pip install -e \'.[pandas]\'" '
+            '"pip install holder-kit[pandas]" (or "pip install -e \'.[pandas]\'" '
             "from a source checkout)"
         ) from None
 

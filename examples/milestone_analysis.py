@@ -4,13 +4,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import holder
+import holderkit
 
 
 def main() -> None:
     start = int(datetime(2026, 10, 5, 9, tzinfo=timezone.utc).timestamp())
     with TemporaryDirectory(prefix="holder-milestones-") as temporary:
-        with holder.open(Path(temporary) / "data") as context:
+        with holderkit.open(Path(temporary) / "data") as context:
             project = context.create_project("Calendar")
             card = context.create_card(project.project_id, "Review evidence", "Research #review")
             milestone = context.milestones.add(
