@@ -176,8 +176,8 @@ This opt-in path builds core. Normal builds and CI use the published SDK.
 
 CI runs on Python pushes and pull requests; manual CI accepts a `core_ref` pin.
 The same workflow exposes `workflow_call` for core's publication integration:
-`core_ref` selects the exact published core commit and `python_ref` selects the
-Python source revision (default `main`). Both revisions are resolved once for
+`core_ref` selects the exact published core commit and `kit_ref` selects the
+Holder Kit source revision (default `main`). Both revisions are resolved once for
 all jobs. There is no scheduled polling. Core's caller is a separate workflow,
 so downstream test failures are reported independently of SDK publication.
 
