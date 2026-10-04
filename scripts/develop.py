@@ -44,7 +44,7 @@ Commands:
   clean                   Remove build/make and out/make only
 
 Default core discovery:
-  HOLDER_PYTHON_CORE_SOURCE, then ../holder-core, then build/deps/holder-core.
+  HOLDER_KIT_CORE_SOURCE, then ../holder-core, then build/deps/holder-core.
   Missing core stops with instructions before creating a venv or installing.
   Existing source checkouts are never switched, pulled or reset.
   --sdk, HOLDER_CORE_SDK or HOLDER_CORE_REF explicitly select the SDK workflow.
@@ -58,9 +58,9 @@ Examples:
   ./make.sh --sdk wheel Release
 
 Environment:
-  HOLDER_PYTHON              Bootstrap Python (3.10+); otherwise reuse .venv
-  HOLDER_PYTHON_VENV         Venv path (default .venv)
-  HOLDER_PYTHON_CORE_SOURCE  Override the discovered core source path
+  HOLDER_KIT                 Bootstrap Python (3.10+); otherwise reuse .venv
+  HOLDER_KIT_VENV            Venv path (default .venv)
+  HOLDER_KIT_CORE_SOURCE     Override the discovered core source path
   HOLDER_CORE_SDK            Explicit prepared SDK directory
   HOLDER_CORE_REF            Explicit SDK tag/SHA or latest-green
   HOLDER_CORE_SDK_TOOL       Override core's shared SDK consumer script
@@ -85,7 +85,7 @@ class Developer:
         self.env = dict(env)
         self.env["PYTHONDONTWRITEBYTECODE"] = "1"
         self.build_type = self.env.get("BUILD_TYPE") or "RelWithDebInfo"
-        self.venv = self.path(self.env.get("HOLDER_PYTHON_VENV") or ".venv")
+        self.venv = self.path(self.env.get("HOLDER_KIT_VENV") or ".venv")
         self.managed = self.root / "build/deps/holder-core"
 
     def path(self, value: str) -> Path:
@@ -127,7 +127,7 @@ class Developer:
         return source
 
     def discover_source(self) -> Path:
-        explicit = self.env.get("HOLDER_PYTHON_CORE_SOURCE")
+        explicit = self.env.get("HOLDER_KIT_CORE_SOURCE")
         if explicit:
             return self.validate_source(self.path(explicit))
         for candidate in (self.root.parent / "holder-core", self.managed):
@@ -140,7 +140,7 @@ class Developer:
             f"  git clone https://github.com/HolderTeam/holder-core.git {shlex.quote(str(sibling))}\n\n"
             "Or prepare the tested revision inside this repository:\n"
             "  ./make.sh setup-core\n\n"
-            "Then run ./make.sh again. For a different checkout, set HOLDER_PYTHON_CORE_SOURCE.\n"
+            "Then run ./make.sh again. For a different checkout, set HOLDER_KIT_CORE_SOURCE.\n"
             "Published SDK builds are available explicitly with ./make.sh --sdk."
         )
 
@@ -157,11 +157,11 @@ class Developer:
     def report_source(self, source: Path) -> dict[str, object]:
         pin = self.pin()["commit"]
         commit, dirty = self.source_revision(source)
-        if source == self.managed.resolve() and commit != pin and not self.env.get("HOLDER_PYTHON_CORE_SOURCE"):
+        if source == self.managed.resolve() and commit != pin and not self.env.get("HOLDER_KIT_CORE_SOURCE"):
             raise AdviceError(
                 f"Managed core checkout is not at the recorded commit {pin}.\n"
                 "It will not be changed. Move it aside and run ./make.sh setup-core, or select it\n"
-                "explicitly with HOLDER_PYTHON_CORE_SOURCE to use it as a developer checkout."
+                "explicitly with HOLDER_KIT_CORE_SOURCE to use it as a developer checkout."
             )
         print(f"Core source: {source}", flush=True)
         print(f"Core revision: {commit or 'unknown (not a Git checkout)'}{' (working tree has changes)' if dirty else ''}", flush=True)
@@ -241,7 +241,7 @@ class Developer:
     def prepare_venv(self) -> Path:
         if not self.venv_python().is_file():
             if self.venv.exists() or self.venv.is_symlink():
-                raise AdviceError(f"{self.venv} exists but has no virtualenv Python; choose HOLDER_PYTHON_VENV.")
+                raise AdviceError(f"{self.venv} exists but has no virtualenv Python; choose HOLDER_KIT_VENV.")
             try:
                 self.run([sys.executable, "-m", "venv", str(self.venv)])
             except subprocess.CalledProcessError as error:
@@ -289,8 +289,8 @@ class Developer:
         settings = [
             f"--config-settings=build-dir=build/make/{backend}/{self.build_type}/{{wheel_tag}}",
             f"--config-settings=cmake.build-type={self.build_type}",
-            f"--config-settings=cmake.define.HOLDER_PYTHON_CORE_SOURCE={source or ''}",
-            "--config-settings=cmake.define.HOLDER_PYTHON_SANITIZE=",
+            f"--config-settings=cmake.define.HOLDER_KIT_CORE_SOURCE={source or ''}",
+            "--config-settings=cmake.define.HOLDER_KIT_SANITIZE=",
         ]
         if not source and platform.system() == "Windows":
             sdk = Path(self.env["HOLDER_CORE_SDK"]).as_posix()
@@ -333,7 +333,7 @@ class Developer:
             commit, dirty = self.source_revision(source)
             if commit != pin["commit"] or dirty:
                 raise AdviceError("Existing managed core checkout differs from the clean recorded revision.\n"
-                                  "It will not be changed; move it aside or use HOLDER_PYTHON_CORE_SOURCE.")
+                                  "It will not be changed; move it aside or use HOLDER_KIT_CORE_SOURCE.")
             print(f"Managed core is already ready at {commit}: {source}", flush=True)
             return
         self.managed.parent.mkdir(parents=True, exist_ok=True)
@@ -386,9 +386,9 @@ def main(args: Sequence[str] | None = None, *, root: Path = ROOT, env: Mapping[s
             raise AdviceError(f"{mode} accepts one argument")
         if sdk_flag and mode not in BUILD_COMMANDS | {"sdk"}:
             raise AdviceError("--sdk applies to setup/build/test/check/wheel or sdk.")
-        if sdk_flag and developer.env.get("HOLDER_PYTHON_CORE_SOURCE"):
-            raise AdviceError("Choose --sdk or HOLDER_PYTHON_CORE_SOURCE, not both.")
-        sdk = sdk_flag or (not developer.env.get("HOLDER_PYTHON_CORE_SOURCE") and bool(
+        if sdk_flag and developer.env.get("HOLDER_KIT_CORE_SOURCE"):
+            raise AdviceError("Choose --sdk or HOLDER_KIT_CORE_SOURCE, not both.")
+        sdk = sdk_flag or (not developer.env.get("HOLDER_KIT_CORE_SOURCE") and bool(
             developer.env.get("HOLDER_CORE_SDK") or developer.env.get("HOLDER_CORE_REF")))
         if mode in BUILD_COMMANDS:
             python = developer.build(mode, sdk)
