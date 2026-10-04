@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       commit: ${{ steps.resolve.outputs.commit }}
-      python_commit: ${{ steps.source.outputs.python_commit }}
+      kit_commit: ${{ steps.source.outputs.kit_commit }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,9 +39,9 @@ jobs:
           ref: ${{ github.repository == 'HolderTeam/holder-kit' && github.sha || inputs.kit_ref || 'main' }}
           persist-credentials: false
       - id: source
-        name: Record Python source revision
+        name: Record Holder Kit source revision
         shell: bash
-        run: echo "python_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "kit_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -78,7 +78,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HolderTeam/holder-kit
-          ref: ${{ needs.core-sdk.outputs.python_commit }}
+          ref: ${{ needs.core-sdk.outputs.kit_commit }}
           persist-credentials: false
 
       - name: Fetch verified core SDK
@@ -243,7 +243,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HolderTeam/holder-kit
-          ref: ${{ needs.core-sdk.outputs.python_commit }}
+          ref: ${{ needs.core-sdk.outputs.kit_commit }}
           persist-credentials: false
 
       - name: Set up Python 3.12
@@ -294,7 +294,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HolderTeam/holder-kit
-          ref: ${{ needs.core-sdk.outputs.python_commit }}
+          ref: ${{ needs.core-sdk.outputs.kit_commit }}
           persist-credentials: false
 
       - name: Set up Python 3.12
