@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DHOLDER_USE_SYSTEM_CORE=ON \
+		-DPython_EXECUTABLE=/usr/bin/python3 \
+		-DHOLDER_KIT_INSTALL_DIR=lib/python3/dist-packages/holderkit \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	DESTDIR=$(CURDIR)/build/test-install cmake --install build --prefix /usr
+	PYTHONPATH=$(CURDIR)/build/test-install/usr/lib/python3/dist-packages /usr/bin/python3 -m pytest -q tests
+endif
+
+%:
+	dh $@ --with python3 --buildsystem=cmake+ninja --builddirectory=build

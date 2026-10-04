@@ -29,7 +29,7 @@ Developer environment variables and CMake options now use `HOLDER_KIT*`:
 `HOLDER_KIT_CORE_SOURCE` selects a core source checkout, and
 `HOLDER_KIT_SANITIZE` configures native-shim sanitizers through CMake. Update
 existing shell configuration and build commands to these names; the former
-`HOLDER_PYTHON*` names are no longer read. Upstream libholder names,
+`HOLDER_KIT*` names are no longer read. Upstream libholder names,
 SDK paths and durable project formats retain their existing names.
 
 ## Build from source
@@ -163,6 +163,41 @@ distribution's C++ dependency ABI can fail at import time.
 Windows runtime DLLs and their license notices are installed beside the extension.
 Installed SDK builds include `holderkit/_core_build.json` with the exact core commit,
 version, platform, build configuration, and compiler, plus the matching schema.
+
+## Ubuntu packages
+
+`python3-holder-kit` builds against the Ubuntu series' `libholder-dev` package and
+uses `libholder0` at runtime. It installs for the distribution's Python in
+`/usr/lib/python3/dist-packages`; pandas and NetworkX remain optional.
+
+With the Holder PPA enabled and `libholder-dev` plus Python development headers
+installed, the same shared-library mode is available through normal CMake:
+
+```sh
+cmake -S . -B build/system -G Ninja -DHOLDER_USE_SYSTEM_CORE=ON
+cmake --build build/system
+```
+
+System mode requires `Holder::Shared` and rejects simultaneous SDK or core source
+selections. It installs the matching schema and `_core_build.json`, recording
+the core version, Debian package revision and schema digest. It does not copy
+libholder into the Python package.
+
+Packaging files live in `packaging/linux/debian`. The Ubuntu package workflow
+builds and tests Noble and Resolute separately, then installs each binary in a
+fresh container without development packages. It tests ordinary Python use
+before installing the optional adapters, followed by their integration tests.
+Package builds use distro CMake and Python directly, without fetching pip build
+dependencies.
+
+The manual Launchpad workflow prepares source candidates by default. Select the
+Python version, Debian revision and exact core package version (before its
+`~noble1` or `~resolute1` suffix). Each candidate pins `libholder-dev` for its
+series; runtime dependencies are generated against the compatible shared ABI.
+The workflow can also sign and upload those candidates to the Holder PPA.
+
+These packages serve the system Python. Public pip distribution and portable
+wheels for isolated virtualenvs are a separate follow-up.
 
 For a manual source build without `make.sh`, clone `holder-core` beside this
 repository and pass its absolute path to pip:
@@ -397,6 +432,6 @@ They are not atomic transactions; see the record-contract documentation before
 building retry or bulk-write workflows. Iteration and batching are the next slice.
 
 The base package has no data-science dependencies. The broader
-libholder API, concurrency support, stable-ABI wheels, public pip distribution, and Debian/Ubuntu `python3-holder-kit`
-packaging remain later work. CI validates the SDK consumer on Linux, macOS,
+libholder API, concurrency support, stable-ABI wheels and public pip distribution
+remain later work. CI validates the SDK consumer on Linux, macOS,
 and Windows.

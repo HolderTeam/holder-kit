@@ -1,0 +1,79 @@
+name: Prepare Holder Kit Launchpad packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Expected pyproject.toml version
+        required: true
+        default: '0.2.0'
+      package_revision:
+        description: Debian revision (increment for each replacement upload)
+        required: true
+        default: '1'
+      core_package_version:
+        description: Exact core package version before the Ubuntu suffix
+        required: true
+        default: '0.2.0-1'
+      upload:
+        description: Sign and upload the source candidates to the Holder PPA
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        series: [noble, resolute]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install source packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends devscripts debhelper dh-python dput gnupg
+      - name: Prepare pinned source candidate
+        env:
+          UPSTREAM_VERSION: ${{ inputs.version }}
+          PACKAGE_REVISION: ${{ inputs.package_revision }}
+          CORE_PACKAGE_VERSION: ${{ inputs.core_package_version }}
+          SERIES: ${{ matrix.series }}
+        run: |
+          python3 scripts/prepare-debian-source.py --version "$UPSTREAM_VERSION" \
+            --package-revision "$PACKAGE_REVISION" --series "$SERIES" \
+            --core-package-version "${CORE_PACKAGE_VERSION}~${SERIES}1"
+          debuild -S -d -us -uc
+      - name: Save source candidate
+        run: |
+          mkdir -p out/source
+          cp ../holder-kit_*.dsc ../holder-kit_*.tar.* \
+            ../holder-kit_*_source.changes ../holder-kit_*_source.buildinfo out/source/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: holder-kit-source-${{ matrix.series }}
+          path: out/source/*
+          if-no-files-found: error
+      - name: Sign source candidate
+        if: inputs.upload
+        env:
+          PPA_GPG_PRIVATE_KEY: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
+        run: |
+          test -n "$PPA_GPG_PRIVATE_KEY"
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          printf '%s\n' "$PPA_GPG_PRIVATE_KEY" | gpg --batch --import
+          keyid="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')"
+          test -n "$keyid"
+          printf 'batch\nyes\npinentry-mode loopback\n' > ~/.gnupg/gpg.conf
+          printf 'allow-loopback-pinentry\n' > ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+          debsign -k"$keyid" ../holder-kit_*_source.changes
+      - name: Upload source candidate
+        if: inputs.upload
+        run: dput ppa:holderteam/holder ../holder-kit_*_source.changes
