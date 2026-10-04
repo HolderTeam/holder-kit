@@ -17,8 +17,8 @@ on:
         description: Exact published core commit to test
         required: true
         type: string
-      python_ref:
-        description: Python source revision (resolved once for all jobs)
+      kit_ref:
+        description: Holder Kit source revision (resolved once for all jobs)
         default: main
         type: string
 
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: HolderTeam/holder-kit
-          ref: ${{ github.repository == 'HolderTeam/holder-kit' && github.sha || inputs.python_ref || 'main' }}
+          ref: ${{ github.repository == 'HolderTeam/holder-kit' && github.sha || inputs.kit_ref || 'main' }}
           persist-credentials: false
       - id: source
         name: Record Python source revision
