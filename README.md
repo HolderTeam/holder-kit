@@ -24,8 +24,12 @@ and optional dependencies are unchanged.
 The repository is `HolderTeam/holder-kit`. Source URLs, clone commands and CI
 checkout references use this name. The local checkout directory need not be
 renamed.
-The existing `HOLDER_PYTHON*` developer environment variables and CMake options
-remain available; they configure the Python build. Upstream libholder names,
+Developer environment variables and CMake options now use `HOLDER_KIT*`:
+`HOLDER_KIT` selects the Python interpreter, `HOLDER_KIT_VENV` selects the venv,
+`HOLDER_KIT_CORE_SOURCE` selects a core source checkout, and
+`HOLDER_KIT_SANITIZE` configures native-shim sanitizers through CMake. Update
+existing shell configuration and build commands to these names; the former
+`HOLDER_PYTHON*` names are no longer read. Upstream libholder names,
 SDK paths and durable project formats retain their existing names.
 
 ## Build from source
@@ -47,7 +51,7 @@ check out this repository and run `./make.sh` on Linux, macOS or BSD:
 
 The default is a **local core source build**, using the first applicable location:
 
-1. An explicit `HOLDER_PYTHON_CORE_SOURCE` path.
+1. An explicit `HOLDER_KIT_CORE_SOURCE` path.
 2. A sibling `../holder-core` checkout.
 3. A managed `build/deps/holder-core` checkout.
 
@@ -107,8 +111,8 @@ SDK builds unless an explicit source path is provided. `--sdk` combined with an
 explicit source path is rejected. SDK dependency ABI limitations still apply;
 there is no silent fallback from failed SDK builds to source builds.
 
-`HOLDER_PYTHON` selects the interpreter used to create a new venv;
-`HOLDER_PYTHON_VENV` selects its path. Build types have separate native build
+`HOLDER_KIT` selects the interpreter used to create a new venv;
+`HOLDER_KIT_VENV` selects its path. Build types have separate native build
 directories, as do SDK and source builds. See help for the remaining commands
 and environment options. Platform/compiler dependencies still need to be
 installed as described below.
@@ -165,7 +169,7 @@ repository and pass its absolute path to pip:
 
 ```sh
 python -m pip install -e . \
-  --config-settings=cmake.define.HOLDER_PYTHON_CORE_SOURCE="$(cd ../holder-core && pwd)"
+  --config-settings=cmake.define.HOLDER_KIT_CORE_SOURCE="$(cd ../holder-core && pwd)"
 ```
 
 This opt-in path builds core. Normal builds and CI use the published SDK.
@@ -195,7 +199,7 @@ Every test uses pytest's temporary directory and never opens a user's Holder
 data directory or contacts a running daemon.
 
 For native memory-safety work, configure a separate build with
-`HOLDER_PYTHON_SANITIZE=address,undefined`. The option instruments the C
+`HOLDER_KIT_SANITIZE=address,undefined`. The option instruments the C
 extension shim only. Core owns its own sanitizer coverage; the prebuilt core
 library is not instrumented by this job.
 

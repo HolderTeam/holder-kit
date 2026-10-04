@@ -122,7 +122,7 @@ def test_sibling_default_and_arguments(repo: Path, fake: FakeCommands) -> None:
     assert cli(repo, "test", "Debug", "-k", "connections or graph") == 0
     assert fake.calls[-1][1:] == ["-m", "pytest", "-k", "connections or graph"]
     pip = next(call for call in fake.calls if "pip" in call)
-    assert f"--config-settings=cmake.define.HOLDER_PYTHON_CORE_SOURCE={sibling}" in pip
+    assert f"--config-settings=cmake.define.HOLDER_KIT_CORE_SOURCE={sibling}" in pip
     assert "--config-settings=cmake.build-type=Debug" in pip
     assert not any("fetch" in call or "checkout" in call or "pull" in call for call in fake.calls)
     provenance = json.loads((repo / "out/make/core-source.json").read_text())
@@ -132,11 +132,11 @@ def test_sibling_default_and_arguments(repo: Path, fake: FakeCommands) -> None:
 def test_explicit_source_precedence_and_invalid_path(repo: Path, fake: FakeCommands) -> None:
     create_core(repo.parent / "holder-core")
     selected = create_core(repo / "custom core")
-    assert cli(repo, "build", HOLDER_PYTHON_CORE_SOURCE="custom core", HOLDER_CORE_SDK="ignored") == 0
-    assert f"--config-settings=cmake.define.HOLDER_PYTHON_CORE_SOURCE={selected}" in fake.calls[-1]
+    assert cli(repo, "build", HOLDER_KIT_CORE_SOURCE="custom core", HOLDER_CORE_SDK="ignored") == 0
+    assert f"--config-settings=cmake.define.HOLDER_KIT_CORE_SOURCE={selected}" in fake.calls[-1]
     assert "HOLDER_CORE_SDK" not in fake.envs[-1]
     fake.calls.clear()
-    assert cli(repo, "build", HOLDER_PYTHON_CORE_SOURCE="missing") == 2
+    assert cli(repo, "build", HOLDER_KIT_CORE_SOURCE="missing") == 2
     assert not fake.calls
 
 
@@ -155,7 +155,7 @@ def test_managed_fallback_and_wrong_revision(repo: Path, fake: FakeCommands) -> 
     fake.calls.clear()
     assert cli(repo) == 2
     assert not any("pip" in call or "checkout" in call for call in fake.calls)
-    assert cli(repo, "build", HOLDER_PYTHON_CORE_SOURCE=str(managed)) == 0
+    assert cli(repo, "build", HOLDER_KIT_CORE_SOURCE=str(managed)) == 0
 
 
 def test_cmake_failure_precedes_venv_and_packages(repo: Path, fake: FakeCommands, capsys: pytest.CaptureFixture[str]) -> None:
@@ -196,9 +196,9 @@ def test_prepared_sdk_and_conflicting_flags(repo: Path, fake: FakeCommands) -> N
     (sdk / "libholder-manifest.json").write_text("{}")
     assert cli(repo, "build", HOLDER_CORE_SDK="sdk") == 0
     assert not any("resolve" in call or "fetch" in call for call in fake.calls)
-    assert "--config-settings=cmake.define.HOLDER_PYTHON_CORE_SOURCE=" in fake.calls[-1]
+    assert "--config-settings=cmake.define.HOLDER_KIT_CORE_SOURCE=" in fake.calls[-1]
     fake.calls.clear()
-    assert cli(repo, "--sdk", HOLDER_PYTHON_CORE_SOURCE="core") == 2
+    assert cli(repo, "--sdk", HOLDER_KIT_CORE_SOURCE="core") == 2
     assert not fake.calls
 
 
@@ -255,7 +255,7 @@ def test_portable_source_route(repo: Path, fake: FakeCommands, monkeypatch: pyte
 
 def test_launcher_from_another_directory(repo: Path) -> None:
     env = os.environ.copy()
-    env["HOLDER_PYTHON"] = sys.executable
+    env["HOLDER_KIT"] = sys.executable
     result = subprocess.run(
         ["bash", str(repo / "make.sh"), "--help"], cwd=repo.parent,
         env=env, capture_output=True, text=True, check=False,

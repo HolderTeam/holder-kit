@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 project(holder_kit LANGUAGES C CXX)
 
-set(HOLDER_PYTHON_SANITIZE "" CACHE STRING
+set(HOLDER_KIT_SANITIZE "" CACHE STRING
   "Sanitizers for the Python native shim (for example address,undefined)")
 
 set(HOLDER_CORE_SDK "" CACHE PATH "Verified installed core SDK")
@@ -12,11 +12,11 @@ if(NOT "$ENV{HOLDER_CORE_SDK}" STREQUAL "")
   set(HOLDER_CORE_SDK "$ENV{HOLDER_CORE_SDK}")
 endif()
 file(TO_CMAKE_PATH "${HOLDER_CORE_SDK}" HOLDER_CORE_SDK)
-set(HOLDER_PYTHON_CORE_SOURCE "" CACHE PATH "Explicit source-build development override")
-if(HOLDER_PYTHON_CORE_SOURCE)
+set(HOLDER_KIT_CORE_SOURCE "" CACHE PATH "Explicit source-build development override")
+if(HOLDER_KIT_CORE_SOURCE)
   set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-  add_subdirectory("${HOLDER_PYTHON_CORE_SOURCE}" holder-core EXCLUDE_FROM_ALL)
-  set(holder_schema "${HOLDER_PYTHON_CORE_SOURCE}/schema/schema.sql")
+  add_subdirectory("${HOLDER_KIT_CORE_SOURCE}" holder-core EXCLUDE_FROM_ALL)
+  set(holder_schema "${HOLDER_KIT_CORE_SOURCE}/schema/schema.sql")
 else()
   if(NOT EXISTS "${HOLDER_CORE_SDK}/libholder-manifest.json")
     message(FATAL_ERROR "Missing core SDK. Run scripts/core-sdk.py resolve and fetch, then set HOLDER_CORE_SDK. No automatic source fallback is available.")
@@ -38,13 +38,13 @@ target_compile_features(_native PRIVATE c_std_11)
 target_link_libraries(_native PRIVATE Holder::Core)
 set_target_properties(_native PROPERTIES LINKER_LANGUAGE CXX)
 
-if(HOLDER_PYTHON_SANITIZE)
+if(HOLDER_KIT_SANITIZE)
   target_compile_options(_native PRIVATE
-    -fsanitize=${HOLDER_PYTHON_SANITIZE}
+    -fsanitize=${HOLDER_KIT_SANITIZE}
     -fno-omit-frame-pointer
     -g
   )
-  target_link_options(_native PRIVATE -fsanitize=${HOLDER_PYTHON_SANITIZE})
+  target_link_options(_native PRIVATE -fsanitize=${HOLDER_KIT_SANITIZE})
 endif()
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

@@ -125,7 +125,7 @@ jobs:
 
       - name: Build instrumented Holder Kit for lifecycle smoke tests
         if: ${{ matrix.sanitized }}
-        run: python3 -m pip install --verbose --config-settings=cmake.define.HOLDER_PYTHON_SANITIZE=address,undefined . 'pytest>=8'
+        run: python3 -m pip install --verbose --config-settings=cmake.define.HOLDER_KIT_SANITIZE=address,undefined . 'pytest>=8'
 
       - name: Configure sanitizer runtime
         if: ${{ matrix.sanitized }}
