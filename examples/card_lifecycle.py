@@ -6,11 +6,11 @@ import json
 import tempfile
 from pathlib import Path
 
-from holder import Context
+from holderkit import Context
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="holder-python-example-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="holder-kit-example-") as temporary:
         data_dir = Path(temporary) / "data"
         with Context(data_dir) as context:
             project = context.create_project("Python example")

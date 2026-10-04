@@ -1,14 +1,32 @@
-# holder-python
+# Holder Kit
 
-`holder-python` provides CPython bindings for running libholder directly inside
+Holder Kit provides CPython bindings for running libholder directly inside
 a Python process. It offers a small typed interface for projects, cards and
 explicit connections, tags and milestones, including detached dataclasses, plain dictionary records,
 and optional pandas and NetworkX exports.
 
-The compiled extension is `holder._native`. The `holder` package supplies the
+The compiled extension is `holderkit._native`. The `holderkit` package supplies the
 small public wrapper and loads the database schema shipped from the selected
 core source revision or SDK. It does not communicate with `holderd` and does not
 implement a REST or command-line wrapper.
+
+## Distribution and import migration
+
+The Python distribution is now `holder-kit` and the import package is `holderkit`.
+Replace `holder` in dependency declarations with `holder-kit`, including extras
+such as `holder-kit[pandas]` and `holder-kit[graph]`. Replace `import holder` and
+`from holder ...` with `import holderkit` and `from holderkit ...`. The former
+`holder` package is not shipped, and there is no compatibility import shim.
+In an existing environment, uninstall the former `holder` distribution before
+installing the renamed wheel or checkout. The public methods, record contracts
+and optional dependencies are unchanged.
+
+The intended repository name is `holder-kit`. Until the separate GitHub rename,
+source URLs, clone commands and CI checkout references continue to use
+`HolderTeam/holder-python`. The local checkout directory need not be renamed.
+The existing `HOLDER_PYTHON*` developer environment variables and CMake options
+remain available; they configure the Python build. Upstream libholder names,
+SDK paths and durable project formats retain their existing names.
 
 ## Build from source
 
@@ -122,7 +140,7 @@ bundled `vcpkg/scripts/buildsystems/vcpkg.cmake` toolchain,
 `VCPKG_INSTALLED_DIR=<sdk>/vcpkg/installed`, `VCPKG_TARGET_TRIPLET=x64-windows`,
 `VCPKG_MANIFEST_MODE=OFF`, and `VCPKG_APPLOCAL_DEPS=OFF`.
 The SDK supplies prebuilt development dependencies;
-no vcpkg bootstrap or dependency compilation runs in holder-python.
+no vcpkg bootstrap or dependency compilation runs in Holder Kit.
 
 Use `python scripts/core-sdk.py resolve --core-ref <tag-or-full-SHA>` for an
 explicit pin. Use `fetch --build-type Release` and `SKBUILD_CMAKE_BUILD_TYPE=Release`
@@ -139,7 +157,7 @@ The canonical Linux SDK uses the Ubuntu 24.04 dependency ABI. CI tests Python
 their matching core Debian packages. Mixing the static SDK with a newer
 distribution's C++ dependency ABI can fail at import time.
 Windows runtime DLLs and their license notices are installed beside the extension.
-Installed SDK builds include `holder/_core_build.json` with the exact core commit,
+Installed SDK builds include `holderkit/_core_build.json` with the exact core commit,
 version, platform, build configuration, and compiler, plus the matching schema.
 
 For a manual source build without `make.sh`, clone `holder-core` beside this
@@ -199,7 +217,7 @@ directories when they exit.
 ## Current API
 
 ```python
-from holder import Context
+from holderkit import Context
 
 with Context("/path/to/isolated/data") as context:
     project = context.create_project("Notes")
@@ -218,7 +236,9 @@ With the pandas extra installed, the same detached contracts are available as
 predictably typed DataFrames:
 
 ```python
-with holder.open("./knowledge") as context:
+import holderkit
+
+with holderkit.open("./knowledge") as context:
     cards = context.cards.to_dataframe()
     complete = context.cards.to_dataframe(include_content=True)
     projects = context.projects.to_dataframe()
@@ -227,7 +247,9 @@ with holder.open("./knowledge") as context:
 Export related tables together with the same schemas:
 
 ```python
-with holder.open("./knowledge") as context:
+import holderkit
+
+with holderkit.open("./knowledge") as context:
     tables = context.to_dataframes(project_id=None, include_content=True)
 
 # All tables are detached and remain usable after the context closes.
@@ -257,7 +279,7 @@ and extraction consistency are documented in
 [Detached record contracts](docs/record-contracts.md).
 
 A `Context` owns its native `holder_context` and can be closed explicitly or
-with a context manager. Native runtime failures raise `holder.HolderError`;
+with a context manager. Native runtime failures raise `holderkit.HolderError`;
 invalid libholder arguments raise `ValueError`.
 
 ## Connections and graphs
@@ -265,7 +287,9 @@ invalid libholder arguments raise `ValueError`.
 Explicit connections use core's add/update and remove operations:
 
 ```python
-with holder.open("./knowledge") as context:
+import holderkit
+
+with holderkit.open("./knowledge") as context:
     project = context.create_project("Graph demo")
     first = context.create_card(project.project_id, "Evidence")
     second = context.create_card(project.project_id, "Report")
@@ -275,7 +299,7 @@ with holder.open("./knowledge") as context:
     graph = context.to_networkx(project.project_id)                # graph extra
 ```
 
-Install `holder[graph]` (or `pip install -e '.[graph]'` from this checkout) for
+Install `holder-kit[graph]` (or `pip install -e '.[graph]'` from this checkout) for
 NetworkX. Neither pandas nor NetworkX is imported by ordinary base-package use.
 For the combined example, install `pip install -e '.[pandas,graph]'`.
 
@@ -310,7 +334,9 @@ See [Detached record contracts](docs/record-contracts.md) for schemas and limits
 Tags use core's semantic operations; Python never parses or rewrites hashtag text:
 
 ```python
-with holder.open("./knowledge") as context:
+import holderkit
+
+with holderkit.open("./knowledge") as context:
     project = context.create_project("Tags")
     card = context.create_card(project.project_id, "Evidence", "Prose #evidence")
     result = context.tags.add(card.card_id, "TODO")  # TagAddResult.ADDED
@@ -336,7 +362,9 @@ Join `tables["tags"]` to `tables["cards"]` on `project_id` and `card_id`.
 Milestones use integer Unix seconds and core-generated IDs:
 
 ```python
-with holder.open("./knowledge") as context:
+import holderkit
+
+with holderkit.open("./knowledge") as context:
     project = context.create_project("Calendar")
     card = context.create_card(project.project_id, "Review")
     milestones = context.milestones.add(
@@ -365,6 +393,6 @@ They are not atomic transactions; see the record-contract documentation before
 building retry or bulk-write workflows. Iteration and batching are the next slice.
 
 The base package has no data-science dependencies. The broader
-libholder API, concurrency support, stable-ABI wheels, public pip distribution, and Debian/Ubuntu `python3-holder`
+libholder API, concurrency support, stable-ABI wheels, public pip distribution, and Debian/Ubuntu `python3-holder-kit`
 packaging remain later work. CI validates the SDK consumer on Linux, macOS,
 and Windows.

@@ -3,12 +3,12 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import holder
+import holderkit
 
 
 def main() -> None:
     with TemporaryDirectory(prefix="holder-tags-") as temporary:
-        with holder.open(Path(temporary) / "data") as context:
+        with holderkit.open(Path(temporary) / "data") as context:
             project = context.create_project("Tagged notes")
             card = context.create_card(project.project_id, "Evidence", "Review #evidence in prose.")
             print("Add todo:", context.tags.add(card.card_id, "TODO").name)

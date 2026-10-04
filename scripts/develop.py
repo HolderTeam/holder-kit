@@ -26,7 +26,9 @@ EXAMPLES = {
     "tags": "tag_analysis",
     "milestones": "milestone_analysis",
 }
-HELP = """Usage: ./make.sh [--sdk] [command] [BuildType] [args...]
+HELP = """Holder Kit developer commands
+
+Usage: ./make.sh [--sdk] [command] [BuildType] [args...]
 
 Commands:
   help, -h, --help          Show help without creating environments or downloading
@@ -134,7 +136,7 @@ class Developer:
         sibling = self.root.parent / "holder-core"
         raise AdviceError(
             "holder-core source is required for the default developer build.\n\n"
-            "Clone it beside holder-python:\n"
+            "Clone it beside the Holder Kit checkout:\n"
             f"  git clone https://github.com/HolderTeam/holder-core.git {shlex.quote(str(sibling))}\n\n"
             "Or prepare the tested revision inside this repository:\n"
             "  ./make.sh setup-core\n\n"

@@ -723,7 +723,7 @@ Context_get_closed(ContextObject *self, void *Py_UNUSED(closure))
 PyDoc_STRVAR(
     Context_doc,
     "Context(data_dir, schema_sql)\n--\n\n"
-    "Own an embedded libholder context. Prefer holder.Context in public code."
+    "Own an embedded libholder context. Prefer holderkit.Context in public code."
 );
 
 static PyMethodDef Context_methods[] = {
@@ -794,7 +794,7 @@ static PyType_Slot Context_slots[] = {
 };
 
 static PyType_Spec Context_spec = {
-    .name = "holder._native.Context",
+    .name = "holderkit._native.Context",
     .basicsize = sizeof(ContextObject),
     .itemsize = 0,
     .flags = Py_TPFLAGS_DEFAULT,
@@ -822,7 +822,7 @@ holder_module_exec(PyObject *module)
 {
     holder_module_state *state = PyModule_GetState(module);
     state->holder_error = PyErr_NewException(
-        "holder._native.HolderError",
+        "holderkit._native.HolderError",
         PyExc_RuntimeError,
         NULL
     );
@@ -851,7 +851,7 @@ static PyModuleDef_Slot holder_module_slots[] = {
 
 static struct PyModuleDef holder_module = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "holder._native",
+    .m_name = "holderkit._native",
     .m_doc = "Native CPython bindings for embedded libholder.",
     .m_size = sizeof(holder_module_state),
     .m_methods = NULL,

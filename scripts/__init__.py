@@ -1,1 +1,1 @@
-"""Repository developer tools; separate from the installed holder package."""
+"""Repository developer tools; separate from the installed holderkit package."""

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(holder_python LANGUAGES C CXX)
+project(holder_kit LANGUAGES C CXX)
 
 set(HOLDER_PYTHON_SANITIZE "" CACHE STRING
   "Sanitizers for the Python native shim (for example address,undefined)")
@@ -24,10 +24,10 @@ else()
   set(holder_DIR "${HOLDER_CORE_SDK}/lib/cmake/holder" CACHE PATH "Selected core CMake package" FORCE)
   find_package(holder CONFIG REQUIRED PATHS "${holder_DIR}" NO_DEFAULT_PATH)
   set(holder_schema "${HOLDER_CORE_SDK}/share/holder/schema/schema.sql")
-  install(FILES "${HOLDER_CORE_SDK}/libholder-manifest.json" DESTINATION holder RENAME _core_build.json)
+  install(FILES "${HOLDER_CORE_SDK}/libholder-manifest.json" DESTINATION holderkit RENAME _core_build.json)
   if(WIN32)
-    install(DIRECTORY "${HOLDER_CORE_SDK}/bin/" DESTINATION holder/.libs FILES_MATCHING PATTERN "*.dll")
-    install(DIRECTORY "${HOLDER_CORE_SDK}/share/vcpkg-licenses/" DESTINATION holder/_licenses)
+    install(DIRECTORY "${HOLDER_CORE_SDK}/bin/" DESTINATION holderkit/.libs FILES_MATCHING PATTERN "*.dll")
+    install(DIRECTORY "${HOLDER_CORE_SDK}/share/vcpkg-licenses/" DESTINATION holderkit/_licenses)
   endif()
 endif()
 
@@ -54,14 +54,14 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 install(TARGETS _native
-  LIBRARY DESTINATION holder
-  RUNTIME DESTINATION holder
+  LIBRARY DESTINATION holderkit
+  RUNTIME DESTINATION holderkit
 )
 
 # Ship the schema from the selected core revision beside the Python package. The
 # Python wrapper reads this resource at runtime, so installed packages never
 # depend on the source checkout or an absolute development path.
 install(FILES "${holder_schema}"
-  DESTINATION holder
+  DESTINATION holderkit
   RENAME _schema.sql
 )

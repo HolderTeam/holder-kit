@@ -1,4 +1,4 @@
-"""Small public interface to embedded libholder."""
+"""Holder Kit: a small public interface to embedded libholder."""
 
 from __future__ import annotations
 
