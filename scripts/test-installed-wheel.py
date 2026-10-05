@@ -1,0 +1,48 @@
+"""Run with an isolated interpreter after installing a release wheel."""
+
+import argparse
+import importlib.util
+import json
+from importlib.metadata import distribution
+from pathlib import Path
+import sys
+import tempfile
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--core-commit", required=True)
+    parser.add_argument("--version", required=True)
+    args = parser.parse_args()
+    import holderkit
+    from holderkit import _native
+
+    package = Path(holderkit.__file__).parent
+    installed = distribution("holder-kit")
+    assert installed.version == args.version, installed.version
+    assert _native.Context.__module__ == "holderkit._native"
+    assert importlib.util.find_spec("holder") is None
+    assert importlib.util.find_spec("pandas") is None
+    assert importlib.util.find_spec("networkx") is None
+    assert (package / "py.typed").is_file()
+    info = json.loads((package / "_core_build.json").read_text())
+    assert info["commit"] == args.core_commit, info
+    assert info["build_type"] == "Release", info
+    assert not any(name in sys.modules for name in ("pandas", "networkx"))
+    with tempfile.TemporaryDirectory(prefix="kit-installed-wheel-") as temporary:
+        with holderkit.open(Path(temporary) / "data") as context:
+            project = context.create_project("Installed wheel")
+            first = context.create_card(project.project_id, "First", "Before")
+            second = context.create_card(project.project_id, "Second", "Second body")
+            context.update_card(first.card_id, "After", "Renamed")
+            context.connections.add(second.card_id, first.card_id, "depends_on")
+            assert context.connections.to_records(project.project_id)
+            records = context.cards.to_records(project.project_id, include_content=True)
+            assert any(card["content"] == "After" for card in records)
+            context.connections.remove(second.card_id, first.card_id, "depends_on")
+            assert context.connections.to_records(project.project_id) == []
+    print(f"Installed holder-kit {installed.version} passed with core {info['commit']}")
+
+
+if __name__ == "__main__":
+    main()
