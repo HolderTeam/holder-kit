@@ -11,6 +11,9 @@ on:
       - src/**
       - scripts/*wheel*.py
       - scripts/check-release-distributions.py
+      - scripts/pypi_readme.py
+      - README.md
+      - docs/**
   workflow_dispatch:
     inputs:
       destination:
@@ -96,6 +99,7 @@ jobs:
       - name: Build wheel
         shell: bash
         run: |
+          python scripts/pypi_readme.py --commit "$GITHUB_SHA"
           python -m pip install --upgrade pip
           python -m pip install build wheel twine
           python -m build --wheel --outdir out/raw
@@ -165,6 +169,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: |
+          python scripts/pypi_readme.py --commit "$GITHUB_SHA"
           python -m pip install build twine
           python -m build --sdist --outdir dist
           python -m twine check --strict dist/*.tar.gz
