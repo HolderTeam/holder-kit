@@ -118,7 +118,7 @@ Holder Kit is currently in early development.
 
 The Python distribution is named `holder-kit` and the import package is `holderkit`.
 
-See the [development and build documentation](docs/development.md) for building the current version from source.
+See [Building Holder Kit](docs/building.md) for installing the current version from source.
 
 Ubuntu packages are also available as `python3-holder-kit` for supported Holder package repositories.
 
@@ -145,10 +145,10 @@ See the [`examples/`](examples/) directory.
 
 ## Documentation
 
-- [Development and building](docs/development.md)
 - [Detached record contracts](docs/record-contracts.md)
-- [Migration notes](docs/migration.md)
-- [Contributing](CONTRIBUTING.md)
+- [Building from source](docs/building.md)
+- [Development](docs/development.md)
+- [Packaging](docs/packaging.md)
 
 ## Status
 
