@@ -30,6 +30,14 @@ Typical uses include:
 
 The base package exposes ordinary Python records and has no data-science dependencies. pandas and NetworkX integrations are available as optional extras.
 
+A typical workflow might be as explained in this generated image:
+
+![AI generated image](docs/workflow.png)
+
+1. You make a new project, or clone an existing one.
+2. You do work and analysis.
+3. You push your experiment, or discard it.
+
 ## A first example
 
 ```python
@@ -47,70 +55,8 @@ with holderkit.open("./knowledge") as holder:
     print(card.title)
 ```
 
-A Holder context can also expose existing cards as ordinary Python records:
-
-```python
-import holderkit
-
-with holderkit.open("./knowledge") as holder:
-    cards = holder.cards.to_records(include_content=True)
-
-for card in cards:
-    print(card["title"])
-```
-
-The returned records are detached from Holder, so they remain ordinary Python data after the context has closed.
-
-## Analyse Holder with pandas
-
-Install the pandas integration to turn Holder data into DataFrames:
-
-```python
-import holderkit
-
-with holderkit.open("./knowledge") as holder:
-    tables = holder.to_dataframes(include_content=True)
-
-cards = tables["cards"]
-projects = tables["projects"]
-
-cards_with_projects = cards.merge(
-    projects[["project_id", "name"]],
-    on="project_id",
-)
-```
-
-`to_dataframes()` provides tables for projects, cards, connections, tags and milestones.
-
-Editing a DataFrame does not modify Holder. Exports are detached data intended for analysis and integration with the wider Python ecosystem.
-
-## Explore connections with NetworkX
-
-Holder cards can have explicit typed connections to other cards.
-
-```python
-import holderkit
-
-with holderkit.open("./knowledge") as holder:
-    graph = holder.to_networkx()
-```
-
-The result is a NetworkX `MultiDiGraph`, making it possible to apply existing graph algorithms and visualisation tools to relationships in your Holder knowledge.
-
-## Tags and milestones
-
-Tags and milestones are first-class parts of the Holder API:
-
-```python
-with holderkit.open("./knowledge") as holder:
-    project = holder.create_project("Research")
-    card = holder.create_card(project.project_id, "Read paper")
-
-    holder.tags.add(card.card_id, "todo")
-    holder.milestones.add(card.card_id, 1791190800)
-```
-
-They can also be exported alongside cards, projects and connections for analysis.
+Follow the [walkthrough](docs/walkthrough.md) to create connected cards, add tags
+and milestones, and analyse detached records with pandas and NetworkX.
 
 ## Installation
 
@@ -145,6 +91,7 @@ See the [`examples/`](examples/) directory.
 
 ## Documentation
 
+- [Walkthrough](docs/walkthrough.md)
 - [Detached record contracts](docs/record-contracts.md)
 - [Building from source](docs/building.md)
 - [Development](docs/development.md)
