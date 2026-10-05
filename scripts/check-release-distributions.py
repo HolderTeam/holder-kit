@@ -40,7 +40,7 @@ def main() -> None:
             assert info["commit"] == pin["commit"] and info["build_type"] == "Release", file
             metadata = Parser().parsestr(wheel.read(f"holder_kit-{version}.dist-info/METADATA").decode())
             assert metadata["Name"] == "holder-kit" and metadata["Version"] == version, file
-            assert metadata.get_payload().strip() == description.strip(), f"Unresolved or inconsistent README in {file}"
+            assert metadata.get_payload().replace("\r\n", "\n").strip() == description.strip(), f"Unresolved or inconsistent README in {file}"
             assert any("third-party/" in notice for notice in metadata.get_all("License-File", [])), file
     assert found == expected, f"Missing wheels: {expected - found}"
     source = args.directory / f"holder_kit-{version}.tar.gz"
