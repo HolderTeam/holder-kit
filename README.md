@@ -2,21 +2,6 @@
 
 **Analyse, transform and import Holder data with Python.**
 
-Holder Kit is a Python toolkit for working directly with Holder data outside any running Holder application.
-
-It is intended for data-oriented and offline workloads:
-* analysing a knowledge base,
-* bulk importing or transforming cards,
-* preparing datasets, machine learning, notebooks, experiments,
-* building graphs,
-* and connecting Holder data to the wider Python scientific ecosystem.
-
-Holder Kit runs `libholder` directly inside the Python process.
-It does not communicate with a running Holder daemon and is not intended
-to be the general-purpose Python interface for controlling a live Holder installation.
-
-## What can you do with it?
-
 Holder Kit gives Python programs direct access to Holder projects, cards, connections, tags and milestones.
 
 Typical uses include:
@@ -37,6 +22,10 @@ A typical workflow might be as explained in this generated image:
 1. You make a new project, or clone an existing one.
 2. You do work and analysis.
 3. You push your experiment, or discard it.
+
+Holder Kit runs `libholder` directly inside the Python process.
+It does not communicate with a running Holder daemon and is not intended
+to be the general-purpose Python interface for controlling a live Holder installation, for that see holder-python.
 
 ## A first example
 
