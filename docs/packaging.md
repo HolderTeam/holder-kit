@@ -63,6 +63,13 @@ Release builds use the exact core commit and `Release` SDK configuration in
 [`release-core.json`](../release-core.json). Ordinary development CI continues
 to use latest-green. A Framework release should set this file to its core pin.
 
+Before building wheels and the source archive, the release workflow rewrites
+relative README links in its checkout to absolute URLs at the release commit.
+Documentation links use GitHub pages; images use raw GitHub image URLs. The
+repository README keeps its relative links. Distribution validation checks
+that every wheel description, the source README and source metadata contain
+the same resolved description.
+
 The wheels embed static core and include its native runtime dependencies, the
 matching schema, type information and supplier notices. Installed wheels need
 no core checkout, compiler or separately installed `libholder0`.
