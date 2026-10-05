@@ -15,17 +15,13 @@ Typical uses include:
 
 The base package exposes ordinary Python records and has no data-science dependencies. pandas and NetworkX integrations are available as optional extras.
 
-A typical workflow might be as explained in this generated image:
+A typical workflow looks like this:
 
 ![AI generated image](docs/workflow.png)
 
 1. You make a new project, or clone an existing one.
 2. You do work and analysis.
 3. You push your experiment, or discard it.
-
-Holder Kit runs `libholder` directly inside the Python process.
-It does not communicate with a running Holder daemon and is not intended
-to be the general-purpose Python interface for controlling a live Holder installation, for that see holder-python.
 
 ## A first example
 
@@ -59,11 +55,16 @@ Ubuntu packages are also available as `python3-holder-kit` for supported Holder 
 
 ## How Holder Kit fits into Holder
 
-Holder Kit is a Python binding over `libholder`.
+Holder Kit is a Python binding over `libholder`, running Holder directly inside
+the Python process. This makes it suitable for scripts, notebooks, data analysis
+and applications that want to embed Holder functionality.
 
-It runs Holder directly inside the Python process rather than communicating with `holderd` over the Framework API. This makes it suitable for scripts, notebooks, data analysis and applications that want to embed Holder functionality.
+To control a running Holder installation through the Framework API, use
+[holder-python](https://github.com/HolderTeam/holder-python).
 
-Holder Kit is versioned independently from the Holder Framework and core library.
+Holder Kit is versioned independently from the
+[Holder Framework](https://github.com/HolderTeam/holder-framework) and
+[core library](https://github.com/HolderTeam/holder-core).
 
 ## Examples
 
