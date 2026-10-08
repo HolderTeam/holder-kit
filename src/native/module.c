@@ -5,6 +5,10 @@
 
 #include <string.h>
 
+#ifndef HOLDER_HAS_PROJECT_IMPORT
+#define HOLDER_HAS_PROJECT_IMPORT 0
+#endif
+
 #ifndef PyCFunction_CAST
 #define PyCFunction_CAST(function) ((PyCFunction)(void (*)(void))(function))
 #endif
@@ -323,6 +327,21 @@ static PyObject *
 Context_list_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
     return context_json_read(self, args, kwargs, "card_id", holder_card_list_tags);
+}
+
+static PyObject *
+Context_import_project(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+#if HOLDER_HAS_PROJECT_IMPORT
+    return context_json_read(self, args, kwargs, "project_root", holder_project_import);
+#else
+    (void)self;
+    (void)args;
+    (void)kwargs;
+    PyErr_SetString(PyExc_NotImplementedError,
+        "This core build does not support explicit project import");
+    return NULL;
+#endif
 }
 
 static PyObject *
@@ -727,6 +746,8 @@ PyDoc_STRVAR(
 );
 
 static PyMethodDef Context_methods[] = {
+    {"import_project", PyCFunction_CAST(Context_import_project), METH_VARARGS | METH_KEYWORDS,
+     PyDoc_STR("Import a durable plain project into an empty context database.")},
     {"list_milestones", PyCFunction_CAST(Context_list_milestones), METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("List a card's milestones ordered by start time.")},
     {"add_milestone", PyCFunction_CAST(Context_add_milestone), METH_VARARGS | METH_KEYWORDS,
@@ -820,6 +841,9 @@ holder_module_clear(PyObject *module)
 static int
 holder_module_exec(PyObject *module)
 {
+    if (PyModule_AddIntConstant(module, "PROJECT_IMPORT_SUPPORTED", HOLDER_HAS_PROJECT_IMPORT) < 0) {
+        return -1;
+    }
     holder_module_state *state = PyModule_GetState(module);
     state->holder_error = PyErr_NewException(
         "holderkit._native.HolderError",

@@ -59,12 +59,17 @@ directory or contact a running daemon. Follow that pattern for new tests.
 ./make.sh examples graph
 ./make.sh examples tags
 ./make.sh examples milestones
+./make.sh examples workspace
 ```
 
 Examples use temporary data directories and clean up on exit. They can also be
 run directly with the development environment's Python. The pandas, tag and
 milestone analysis examples require the pandas extra; graph analysis uses both
 pandas and graph extras. Ordinary base-package use imports neither dependency.
+
+The workspace tests start disposable Git servers on loopback to test real remote
+clones. They require Git and permission to bind/connect local sockets. Fixtures
+use temporary contexts and bare repositories, never a live Holder project.
 
 ## Public API contracts
 

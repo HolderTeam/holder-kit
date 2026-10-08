@@ -168,7 +168,11 @@ def open(data_dir: os.PathLike[str] | str) -> Context:
     return Context(data_dir)
 
 
+from .workspace import Workspace, clone, create, reopen
+
+
 __all__ = [
+    "Workspace", "clone", "create", "reopen",
     "MILESTONE_RECORD_FIELDS", "PROJECT_MILESTONE_RECORD_FIELDS", "MilestoneCollection",
     "MilestoneRecord", "ProjectMilestoneRecord", "MilestoneUpdate",
     "TAG_RECORD_FIELDS", "TagCollection", "ProjectTagRecord", "TaggedCardRecord",

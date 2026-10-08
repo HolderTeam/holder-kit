@@ -15,30 +15,35 @@ Typical uses include:
 
 The base package exposes ordinary Python records and has no data-science dependencies. pandas and NetworkX integrations are available as optional extras.
 
-A typical workflow looks like this:
+The private-workspace workflow starts like this:
 
 ![AI generated image](docs/workflow.png)
 
 1. You make a new project, or clone an existing one.
 2. You do work and analysis.
-3. You push your experiment, or discard it.
+3. Close and reopen the private workspace as needed.
+
+Managed create/remote-clone/reopen are available in the current source API.
+Proposal publication and disposal are later slices.
 
 ## A first example
 
 ```python
 import holderkit
 
-with holderkit.open("./knowledge") as holder:
-    project = holder.create_project("Research")
-
-    card = holder.create_card(
-        project.project_id,
+with holderkit.create("Research", workspace="./research-lab") as lab:
+    card = lab.context.create_card(
+        lab.project.project_id,
         "Interesting question",
         "Something worth investigating.",
     )
 
     print(card.title)
 ```
+
+See [Private workspaces](docs/workspaces.md) for clone/reopen, private storage,
+Git credentials and the required core import capability. The existing
+`holderkit.open(data_dir)` remains available for low-level embedded use.
 
 Follow the [walkthrough](docs/walkthrough.md) to create connected cards, add tags
 and milestones, and analyse detached records with pandas and NetworkX.
@@ -60,7 +65,7 @@ the Python process. This makes it suitable for scripts, notebooks, data analysis
 and applications that want to embed Holder functionality.
 
 To control a running Holder installation through the Framework API, use
-[holder-python](https://github.com/HolderTeam/holder-python).
+[holder-python](https://github.com/HolderTeam/holder-framework/tree/main/python).
 
 Holder Kit is versioned independently from the
 [Holder Framework](https://github.com/HolderTeam/holder-framework) and
@@ -81,6 +86,7 @@ See the [`examples/`](examples/) directory.
 
 ## Documentation
 
+- [Private workspaces](docs/workspaces.md)
 - [Walkthrough](docs/walkthrough.md)
 - [Detached record contracts](docs/record-contracts.md)
 - [Building from source](docs/building.md)
