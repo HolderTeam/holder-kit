@@ -1,18 +1,19 @@
-# Private workspaces
+# Advanced: storage and reopening
+
+Start with the [walkthrough](walkthrough.md) to create a project and analyse its
+cards. `holderkit.create("Research")` and `holderkit.clone(remote_url)` choose
+storage automatically. This guide covers choosing directories, selecting remote
+revisions and returning to saved work.
 
 Holder Kit provides one independent project per managed workspace. The workspace
 contains its own Git checkout and SQLite projection; it does not attach to a
 running Holder installation. Git must be installed for these entry points.
 
-This source-development slice requires core’s explicit `holder_project_import`
-API for cloning. Older SDKs continue to support the existing APIs and managed
-create/reopen, but clone raises `NotImplementedError` before allocating storage
-or contacting a remote. The release pins have not been advanced: publish the
-core addition first, then select and test that exact SDK through Kit’s normal
-dependency tooling before releasing clone support. For current development use
-`HOLDER_KIT_CORE_SOURCE=/path/to/holder-core ./make.sh setup` explicitly.
+Clone requires a Core build with project import support. Older builds raise
+`NotImplementedError` before creating files or contacting a remote. See
+[Development](development.md#clone-build-requirements) for build requirements.
 
-## Create a project
+## Choose a storage directory
 
 ```python
 import holderkit
@@ -34,11 +35,17 @@ nor NetworkX.
 
 `Workspace.context` exposes the existing project/card/connection/tag/milestone
 and analysis APIs. `Workspace.project` is the detached project snapshot from
-opening the workspace. This slice supports exactly one project per workspace;
+opening the workspace. Each workspace supports exactly one project;
 creating additional projects through the low-level context makes it ineligible
 for managed reopening.
 
-## Clone a committed remote revision
+Each workspace stores a completion marker at `.holder-kit.json`, its private
+database at `data/server/holder.db`, and one checkout under `data/projects/`.
+The marker records the project's identity, checkout path and initial revision.
+Use the managed APIs to open this directory; the database is reconstructed by
+Core from durable project files when recovery is needed.
+
+## Choose a remote revision and destination
 
 ```python
 with holderkit.clone(
@@ -110,6 +117,8 @@ A marker is written only after successful initialization; interrupted, unmarked
 workspaces cannot be reopened as complete. Remove an interrupted destination
 deliberately after inspecting it, or choose a new destination for retry.
 
-Proposal-branch publication, disposal, refresh and live-project discovery are
-separate future slices. Existing `holderkit.open(data_dir)` remains the low-level
-embedded API; managed entry points do not fall back to it on an arbitrary Home.
+`holderkit.open(data_dir)` remains the low-level embedded API; managed entry
+points do not fall back to it on an arbitrary Home.
+
+For a runnable example with an explicit temporary directory and reopening, see
+[`private_workspace.py`](../examples/private_workspace.py).

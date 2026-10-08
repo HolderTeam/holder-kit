@@ -28,27 +28,26 @@ A typical workflow looks like this:
 ```python
 import holderkit
 
-with holderkit.create("Research", workspace="./research-lab") as lab:
+with holderkit.create("Research") as lab:
     card = lab.context.create_card(
         lab.project.project_id,
         "Interesting question",
         "Something worth investigating.",
     )
 
-    print(card.title)
+    print(lab.context.cards.to_records(include_content=True))
 ```
 
-Use a new directory for `workspace`. Closing the block keeps your project and
-cards on disk. To continue working with them:
+Or clone an existing Holder project and explore its cards:
 
 ```python
-with holderkit.reopen("./research-lab") as lab:
-    records = lab.context.cards.to_records(include_content=True)
-    print(records)
+with holderkit.clone("git@example.org:research.git") as lab:
+    for card in lab.context.cards.to_records(include_content=True):
+        print(card["title"], card["content"])
 ```
 
-See [Private workspaces](docs/workspaces.md) to clone an existing project and
-learn where your data is stored.
+Replace the example URL with your project's Git remote. Holder Kit chooses
+local storage automatically. These examples need Git installed.
 
 Follow the [walkthrough](docs/walkthrough.md) to create connected cards, add tags
 and milestones, and analyse detached records with pandas and NetworkX.
@@ -86,15 +85,15 @@ The repository includes examples covering:
 - connection graphs;
 - tag analysis;
 - milestone and calendar analysis;
-- creating and reopening private workspaces.
+- creating projects and retaining local edits.
 
 See the [`examples/`](examples/) directory.
 
 ## Documentation
 
-- [Private workspaces](docs/workspaces.md)
 - [Walkthrough](docs/walkthrough.md)
 - [Detached record contracts](docs/record-contracts.md)
+- [Advanced: storage and reopening](docs/workspaces.md)
 - [Building from source](docs/building.md)
 - [Development](docs/development.md)
 - [Packaging](docs/packaging.md)

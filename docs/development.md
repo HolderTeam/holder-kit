@@ -88,6 +88,20 @@ mutation limits. Consult those contracts when changing the API, and keep them
 and the examples consistent with the code. Test empty exports, optional
 dependencies, ownership checks and failure behavior where relevant.
 
+## Clone build requirements
+
+Clone uses Core's `holder_project_import` API. Build against a Core checkout
+that provides it using an explicit source override:
+
+```sh
+HOLDER_KIT_CORE_SOURCE=/path/to/holder-core ./make.sh setup
+```
+
+Existing SDK builds support create/reopen, but clone raises `NotImplementedError`
+when the selected SDK lacks project import support. Release pins have not been
+advanced; select and test an SDK containing the API through the normal dependency
+tooling before releasing clone support.
+
 ## Native sanitizers
 
 For native memory-safety work, use a separate pip/CMake build with
