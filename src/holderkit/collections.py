@@ -16,7 +16,7 @@ from .data.card import (
     _complete_record_from_native,
     _metadata_record_from_native,
 )
-from .data.project import PROJECT_RECORD_FIELDS, Project, ProjectRecord
+from .data.project import PROJECT_RECORD_FIELDS, Project, ProjectRecord, _project_record_from_native
 from .data.connection import CONNECTION_RECORD_FIELDS, ConnectionRecord
 from .data.tag import (
     TAG_RECORD_FIELDS, ProjectTagRecord, TaggedCardRecord, TagRecord,
@@ -200,7 +200,7 @@ class ConnectionCollection:
 
 
 class ProjectCollection:
-    """Read projects from a live context and return detached snapshots."""
+    """Read live projects or export detached project records."""
 
     __slots__ = ("_context",)
 
@@ -208,10 +208,10 @@ class ProjectCollection:
         self._context = context
 
     def list(self) -> builtins.list[Project]:
-        return [Project._from_native(item) for item in self._context.list_projects()]
+        return [Project._from_native(item, self._context) for item in self._context.list_projects()]
 
     def to_records(self) -> builtins.list[ProjectRecord]:
-        return [project.to_record() for project in self.list()]
+        return [_project_record_from_native(item) for item in self._context.list_projects()]
 
     def to_dataframe(self) -> pd.DataFrame:
         """Return a detached, predictably typed project DataFrame."""

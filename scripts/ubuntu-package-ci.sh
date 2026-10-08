@@ -12,7 +12,7 @@ apt-get install -y --no-install-recommends ca-certificates curl gnupg
 bash "$root/scripts/configure-holder-ppa.sh" "$series"
 case "$mode" in
   build)
-    apt-get install -y --no-install-recommends build-essential debhelper cmake ninja-build \
+    apt-get install -y --no-install-recommends build-essential debhelper cmake ninja-build git \
       dh-python python3-dev python3-pytest python3-pandas python3-networkx libholder-dev
     mkdir -p /work/holder-kit /out
     tar -C "$root" --exclude=./.git --exclude=./build --exclude=./out --exclude=./debian \

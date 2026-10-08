@@ -25,6 +25,14 @@ def main() -> None:
     assert importlib.util.find_spec("pandas") is None
     assert importlib.util.find_spec("networkx") is None
     assert (package / "py.typed").is_file()
+    if sys.platform == "win32":
+        notice = "third-party/microsoft-runtime.txt"
+        assert notice in (installed.metadata.get_all("License-File") or [])
+        files = installed.files or []
+        notice_file = next(file for file in files if str(file).endswith(f"/licenses/{notice}"))
+        license_text = installed.locate_file(notice_file).read_text(encoding="utf-8")
+        assert "Source: https://visualstudio.microsoft.com/" in license_text
+        assert "MICROSOFT" in license_text.upper() and "2022" in license_text
     info = json.loads((package / "_core_build.json").read_text())
     assert info["commit"] == args.core_commit, info
     assert info["build_type"] == "Release", info

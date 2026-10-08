@@ -13,7 +13,7 @@ Holder Kit embeds libholder in the Python process. It does not talk to a running
 | `src/native/module.c` | CPython extension, exposed as `holderkit._native` |
 | `src/holderkit/` | Public Python API, typed records and optional adapters |
 | `tests/` | API, adapter and developer-script tests |
-| `examples/` | Runnable examples using temporary Holder data |
+| `examples/` | Runnable examples for project and analysis APIs |
 | `scripts/develop.py` | Developer environment and build commands |
 | `CMakeLists.txt` | Native extension build and resource installation |
 
@@ -59,18 +59,27 @@ directory or contact a running daemon. Follow that pattern for new tests.
 ./make.sh examples graph
 ./make.sh examples tags
 ./make.sh examples milestones
+./make.sh examples make_project
 ```
 
-Examples use temporary data directories and clean up on exit. They can also be
-run directly with the development environment's Python. The pandas, tag and
+`make_project` uses automatic storage and keeps the project it creates. The other
+examples use temporary data directories and clean up on exit. Examples can also
+be run directly with the development environment's Python. The pandas, tag and
 milestone analysis examples require the pandas extra; graph analysis uses both
 pandas and graph extras. Ordinary base-package use imports neither dependency.
+
+The workspace tests start disposable Git servers on loopback to test real remote
+clones. They require Git and permission to bind/connect local sockets. Fixtures
+use temporary contexts and bare repositories, never a live Holder project.
 
 ## Public API contracts
 
 `Context` owns the native `holder_context`; close it explicitly or use a context
 manager. Native runtime failures raise `holderkit.HolderError`, and invalid core
-arguments raise `ValueError`. `Project` and `Card` are frozen, slotted dataclasses.
+arguments raise `ValueError`. `Project` is a live interface to one project;
+its properties read current state. `Card` remains a frozen, slotted snapshot.
+Use `Project.to_record()` for detached project values. Managed Projects own
+their context; Projects obtained from a Context borrow it and close independently.
 
 Records, DataFrames and graphs are detached data. They remain usable after the
 context closes, and editing them does not write back to Holder. Card exports
@@ -82,6 +91,20 @@ nulls, timestamps, project filtering, graph endpoints, tag results and milestone
 mutation limits. Consult those contracts when changing the API, and keep them
 and the examples consistent with the code. Test empty exports, optional
 dependencies, ownership checks and failure behavior where relevant.
+
+## Clone build requirements
+
+Clone uses Core's `holder_project_import` API. Build against a Core checkout
+that provides it using an explicit source override:
+
+```sh
+HOLDER_KIT_CORE_SOURCE=/path/to/holder-core ./make.sh setup
+```
+
+Existing SDK builds support create/reopen, but clone raises `NotImplementedError`
+when the selected SDK lacks project import support. Release pins have not been
+advanced; select and test an SDK containing the API through the normal dependency
+tooling before releasing clone support.
 
 ## Native sanitizers
 

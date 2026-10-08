@@ -28,17 +28,25 @@ A typical workflow looks like this:
 ```python
 import holderkit
 
-with holderkit.open("./knowledge") as holder:
-    project = holder.create_project("Research")
-
-    card = holder.create_card(
-        project.project_id,
+with holderkit.create("Research") as project:
+    card = project.create_card(
         "Interesting question",
         "Something worth investigating.",
     )
 
-    print(card.title)
+    print(project.cards.to_records(include_content=True))
 ```
+
+Or clone an existing Holder project and explore its cards:
+
+```python
+with holderkit.clone("git@example.org:research.git") as project:
+    for card in project.cards.to_records(include_content=True):
+        print(card["title"], card["content"])
+```
+
+Replace the example URL with your project's Git remote. Holder Kit chooses
+local storage automatically. These examples need Git installed.
 
 Follow the [walkthrough](docs/walkthrough.md) to create connected cards, add tags
 and milestones, and analyse detached records with pandas and NetworkX.
@@ -60,7 +68,7 @@ the Python process. This makes it suitable for scripts, notebooks, data analysis
 and applications that want to embed Holder functionality.
 
 To control a running Holder installation through the Framework API, use
-[holder-python](https://github.com/HolderTeam/holder-python).
+[holder-python](https://github.com/HolderTeam/holder-framework/tree/main/python).
 
 Holder Kit is versioned independently from the
 [Holder Framework](https://github.com/HolderTeam/holder-framework) and
@@ -75,7 +83,8 @@ The repository includes examples covering:
 - pandas analysis;
 - connection graphs;
 - tag analysis;
-- milestone and calendar analysis.
+- milestone and calendar analysis;
+- creating projects and retaining local edits.
 
 See the [`examples/`](examples/) directory.
 
@@ -83,6 +92,7 @@ See the [`examples/`](examples/) directory.
 
 - [Walkthrough](docs/walkthrough.md)
 - [Detached record contracts](docs/record-contracts.md)
+- [Advanced: storage and reopening](docs/workspaces.md)
 - [Building from source](docs/building.md)
 - [Development](docs/development.md)
 - [Packaging](docs/packaging.md)
