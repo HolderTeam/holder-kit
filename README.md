@@ -15,13 +15,17 @@ Typical uses include:
 
 The base package exposes ordinary Python records and has no data-science dependencies. pandas and NetworkX integrations are available as optional extras.
 
-A typical workflow looks like this:
+The planned private-workspace workflow looks like this:
 
 ![AI generated image](docs/workflow.png)
 
 1. You make a new project, or clone an existing one.
 2. You do work and analysis.
 3. You push your experiment, or discard it.
+
+Managed create/clone/reopen and publish/discard entry points are planned. The
+current API provides embedded contexts and entity operations; the example below
+uses that existing low-level API.
 
 ## A first example
 
@@ -45,7 +49,15 @@ and milestones, and analyse detached records with pandas and NetworkX.
 
 ## Installation
 
-Holder Kit is currently in early development.
+Holder Kit is currently in early development. Published wheels are available:
+
+```sh
+python -m pip install holder-kit
+```
+
+Wheels support CPython 3.10–3.14 on Linux x86_64 (glibc 2.39+), Windows x86_64
+and macOS ARM64 (macOS 15+). See [Packaging](docs/packaging.md) for platform
+requirements and source-build alternatives.
 
 The Python distribution is named `holder-kit` and the import package is `holderkit`.
 
@@ -60,7 +72,7 @@ the Python process. This makes it suitable for scripts, notebooks, data analysis
 and applications that want to embed Holder functionality.
 
 To control a running Holder installation through the Framework API, use
-[holder-python](https://github.com/HolderTeam/holder-python).
+[holder-python](https://github.com/HolderTeam/holder-framework/tree/main/python).
 
 Holder Kit is versioned independently from the
 [Holder Framework](https://github.com/HolderTeam/holder-framework) and
