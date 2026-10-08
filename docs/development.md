@@ -13,7 +13,7 @@ Holder Kit embeds libholder in the Python process. It does not talk to a running
 | `src/native/module.c` | CPython extension, exposed as `holderkit._native` |
 | `src/holderkit/` | Public Python API, typed records and optional adapters |
 | `tests/` | API, adapter and developer-script tests |
-| `examples/` | Runnable examples using temporary Holder data |
+| `examples/` | Runnable examples for project and analysis APIs |
 | `scripts/develop.py` | Developer environment and build commands |
 | `CMakeLists.txt` | Native extension build and resource installation |
 
@@ -59,11 +59,12 @@ directory or contact a running daemon. Follow that pattern for new tests.
 ./make.sh examples graph
 ./make.sh examples tags
 ./make.sh examples milestones
-./make.sh examples workspace
+./make.sh examples make_project
 ```
 
-Examples use temporary data directories and clean up on exit. They can also be
-run directly with the development environment's Python. The pandas, tag and
+`make_project` uses automatic storage and keeps the project it creates. The other
+examples use temporary data directories and clean up on exit. Examples can also
+be run directly with the development environment's Python. The pandas, tag and
 milestone analysis examples require the pandas extra; graph analysis uses both
 pandas and graph extras. Ordinary base-package use imports neither dependency.
 
