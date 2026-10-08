@@ -60,6 +60,7 @@ directory or contact a running daemon. Follow that pattern for new tests.
 ./make.sh examples tags
 ./make.sh examples milestones
 ./make.sh examples make_project
+./make.sh examples finish_project
 ```
 
 `make_project` uses automatic storage and keeps the project it creates. The other

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -194,10 +195,11 @@ def remote(tmp_path: Path) -> Iterator[Remote]:
             "daemon",
             "--reuseaddr",
             "--export-all",
+            "--enable=receive-pack",
             "--listen=127.0.0.1",
             f"--port={port}",
             f"--base-path={tmp_path}",
-            str(bare),
+            str(tmp_path),
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -225,6 +227,248 @@ def remote(tmp_path: Path) -> Iterator[Remote]:
     finally:
         daemon.terminate()
         daemon.communicate(timeout=5)
+
+
+def test_push_new_project_then_repeat_after_reopen(remote: Remote, tmp_path: Path) -> None:
+    path = tmp_path / "experiment"
+    project = holderkit.create("Experiment", workspace=path)
+    card = project.create_card("Evidence", "Experiment body")
+    root = Path(project.root_path)
+    (root / "notebook.ipynb").write_text("untracked analysis")
+    before = project.revision
+    with pytest.raises(ValueError, match="remote_url"):
+        project.push(branch="analysis/result")
+    preview = project.preview_push(branch="analysis/result", remote_url=remote.url)
+    assert preview.new_branch and preview.has_uncommitted_changes
+    assert preview.revision == before
+    assert not git(remote.bare, "branch", "--list", "analysis/result")
+    result = project.push(branch=preview.branch, remote_url=preview.remote_url,
+                          expected_revision=preview.revision)
+    assert isinstance(result, holderkit.PushResult)
+    assert result.revision == before
+    assert not project.closed and project.remote_url is None
+    assert git(remote.bare, "rev-parse", "refs/heads/analysis/result") == before
+    assert git(remote.bare, "rev-parse", "HEAD") == remote.revision
+    tree = git(remote.bare, "ls-tree", "-r", "--name-only", before)
+    assert "notebook.ipynb" not in tree and "holder.db" not in tree and ".holder-kit" not in tree
+    project.close()
+    project = holderkit.reopen(path)
+    assert not project.preview_push(branch=result.branch, remote_url=remote.url).new_branch
+    assert not project.preview_discard().has_unpublished_commits
+    assert project.preview_discard().has_uncommitted_changes
+    project.update_card(card.card_id, "Next experiment")
+    assert project.preview_discard().has_unpublished_commits
+    with pytest.raises(ValueError, match="reviewed revision"):
+        project.push(branch=result.branch, remote_url=remote.url, expected_revision=before)
+    next_result = project.push(branch=result.branch, remote_url=remote.url)
+    assert next_result.revision != result.revision
+    assert git(remote.bare, "rev-parse", "refs/heads/analysis/result") == next_result.revision
+    assert git(remote.bare, "rev-parse", "HEAD") == remote.revision
+    project.discard(confirm=True)
+    assert project.closed and not path.exists()
+    assert git(remote.bare, "rev-parse", "refs/heads/analysis/result") == next_result.revision
+
+
+def test_clone_push_keeps_origin_and_detached_checkout(remote: Remote, tmp_path: Path) -> None:
+    with holderkit.clone(remote.url, workspace=tmp_path / "clone") as project:
+        project.update_card(remote.card_id, "Proposal")
+        root = Path(project.root_path)
+        old_head = (root / ".git/HEAD").read_text()
+        result = project.push(branch="proposal")
+        assert result.remote_url == remote.url
+        assert project.remote_url == remote.url
+        assert (root / ".git/HEAD").read_text() == old_head
+        assert git(remote.bare, "rev-parse", "HEAD") == remote.revision
+
+
+def test_push_to_another_destination_ignores_hooks_and_tags(remote: Remote, tmp_path: Path) -> None:
+    destination = tmp_path / "own.git"
+    subprocess.run(["git", "init", "--bare", str(destination)], check=True, capture_output=True)
+    url = remote.url.removesuffix("research.git") + "own.git"
+    with holderkit.clone(remote.url, workspace=tmp_path / "clone") as project:
+        project.update_card(remote.card_id, "Own experiment")
+        root = Path(project.root_path)
+        # If hooks were enabled this would fail publication.
+        hook = root / ".git/hooks/pre-push"
+        hook.parent.mkdir(exist_ok=True)
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+        git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test",
+            "tag", "-a", "private-tag", "-m", "Private tag")
+        git(root, "config", "push.followTags", "true")
+        result = project.push(branch="own-experiment", remote_url=url)
+        assert result.remote_url == url and project.remote_url == remote.url
+        assert git(destination, "rev-parse", "refs/heads/own-experiment") == project.revision
+        assert git(destination, "tag", "--list") == ""
+        assert git(remote.bare, "rev-parse", "HEAD") == remote.revision
+        assert git(remote.bare, "branch", "--list", "own-experiment") == ""
+
+
+def test_push_success_with_local_record_failure_can_be_retried(remote: Remote, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from holderkit import _publication
+
+    with holderkit.clone(remote.url, workspace=tmp_path / "clone") as project:
+        original = _publication._save
+        saves = 0
+        def save(path: Path, marker: dict[str, object]) -> None:
+            nonlocal saves
+            saves += 1
+            if saves == 2:
+                raise PermissionError("Fixture record failure")
+            original(path, marker)
+        monkeypatch.setattr(_publication, "_save", save)
+        with pytest.raises(RuntimeError, match="Push succeeded"):
+            project.push(branch="retry-record")
+        assert not project.closed
+        assert git(remote.bare, "rev-parse", "refs/heads/retry-record") == project.revision
+        monkeypatch.setattr(_publication, "_save", original)
+        assert project.push(branch="retry-record").revision == project.revision
+
+
+def test_push_failure_does_not_leak_helper_output(remote: Remote, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from holderkit import _publication
+    from holderkit._storage import _git as real_git
+
+    with holderkit.clone(remote.url, workspace=tmp_path / "clone") as project:
+        def fail(*args: str, network: bool = False) -> bytes:
+            if "push" in args:
+                raise RuntimeError("Fixture credential secret")
+            return real_git(*args, network=network)
+        monkeypatch.setattr(_publication, "_git", fail)
+        with pytest.raises(RuntimeError, match="credentials") as error:
+            project.push(branch="failure")
+        assert "secret" not in str(error.value) and error.value.__suppress_context__
+        assert project.path.exists() and not project.closed
+        assert git(remote.bare, "branch", "--list", "failure") == ""
+
+
+def test_push_rejects_existing_default_and_diverged_branches(remote: Remote, tmp_path: Path) -> None:
+    default = git(remote.bare, "symbolic-ref", "--short", "HEAD")
+    git(remote.bare, "branch", "occupied", remote.revision)
+    with holderkit.clone(remote.url, workspace=tmp_path / "clone") as project:
+        project.update_card(remote.card_id, "Proposal")
+        for branch, message in ((default, "default branch"), ("occupied", "new remote branch")):
+            with pytest.raises(ValueError, match=message):
+                project.push(branch=branch)
+        project.push(branch="proposal")
+        git(remote.source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test",
+            "commit", "--allow-empty", "-m", "Divergent source")
+        git(remote.source, "push", "--force", str(remote.bare), "HEAD:refs/heads/proposal")
+        with pytest.raises(ValueError, match="diverged"):
+            project.push(branch="proposal")
+        assert not project.closed
+        assert project.get_card_content(remote.card_id) == "Proposal"
+
+
+def test_push_creation_race_and_unknown_outcome(remote: Remote, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from holderkit import _publication
+
+    with holderkit.clone(remote.url, workspace=tmp_path / "clone") as project:
+        project.update_card(remote.card_id, "Proposal")
+        from holderkit._storage import _git as real_git
+        def race(*args: str, network: bool = False) -> bytes:
+            if "push" in args:
+                git(remote.bare, "branch", "race", remote.revision)
+            return real_git(*args, network=network)
+        monkeypatch.setattr(_publication, "_git", race)
+        with pytest.raises(RuntimeError, match="local work is retained"):
+            project.push(branch="race")
+        assert git(remote.bare, "rev-parse", "refs/heads/race") == remote.revision
+        assert project.get_card_content(remote.card_id) == "Proposal"
+        monkeypatch.setattr(_publication, "_git", real_git)
+        with pytest.raises(ValueError, match="new remote branch"):
+            project.push(branch="race")
+        def unknown(*args: str, network: bool = False) -> bytes:
+            result = real_git(*args, network=network)
+            if "push" in args:
+                raise RuntimeError("Network response was lost")
+            return result
+        monkeypatch.setattr(_publication, "_git", unknown)
+        with pytest.raises(RuntimeError, match="outcome is unknown"):
+            project.push(branch="recoverable")
+        marker = json.loads((project.path / ".holder-kit.json").read_text())
+        assert not marker.get("publications")
+        monkeypatch.setattr(_publication, "_git", real_git)
+        result = project.push(branch="recoverable")
+        assert result.revision == project.revision
+
+
+@pytest.mark.parametrize("branch", ["", "HEAD", "-option", "refs/heads/topic", "bad name", "bad..name", "bad:ref"])
+def test_invalid_publication_branch_is_rejected(tmp_path: Path, branch: str) -> None:
+    with holderkit.create("Research", workspace=tmp_path / "private") as project:
+        with pytest.raises(ValueError, match="branch"):
+            project.push(branch=branch, remote_url="git@example.org:research.git")
+
+
+def test_discard_confirmation_close_and_stale_handles(tmp_path: Path) -> None:
+    path = tmp_path / "private"
+    project = holderkit.create("Research", workspace=path)
+    card = project.create_card("Evidence", "Unsaved remotely")
+    (Path(project.root_path) / "analysis.txt").write_text("Local artifact")
+    preview = project.preview_discard()
+    assert preview.path == path
+    assert preview.has_unpublished_commits and preview.has_uncommitted_changes
+    assert len(preview.warnings) == 3
+    with pytest.raises(ValueError, match="confirm=True"):
+        project.discard()
+    assert not project.closed and path.exists()
+    project.close()
+    with holderkit.reopen(path) as reopened:
+        assert reopened.get_card_content(card.card_id) == "Unsaved remotely"
+    project.discard(confirm=True)
+    assert project.closed and not path.exists()
+    with pytest.raises(FileNotFoundError):
+        project.discard(confirm=True)
+    with holderkit.create("Replacement", workspace=path) as replacement:
+        with pytest.raises(ValueError, match="different project"):
+            project.discard(confirm=True)
+        assert replacement.name == "Replacement"
+
+
+def test_discard_refuses_shared_context_and_tampered_marker(tmp_path: Path) -> None:
+    with holderkit.open(tmp_path / "shared") as context:
+        first = context.create_project("First")
+        second = context.create_project("Second")
+        for method in (lambda: first.discard(confirm=True), lambda: first.push(branch="proposal")):
+            with pytest.raises(ValueError, match="managed storage|remote_url"):
+                method()
+        assert not context.closed and second.name == "Second"
+    with holderkit.create("Research", workspace=tmp_path / "private") as project:
+        marker_path = project.path / ".holder-kit.json"
+        marker = json.loads(marker_path.read_text())
+        marker["project_path"] = "../../outside"
+        marker_path.write_text(json.dumps(marker))
+        with pytest.raises(ValueError, match="project path"):
+            project.discard(confirm=True)
+        assert not project.closed
+
+
+def test_discard_refuses_symlink_redirect(tmp_path: Path) -> None:
+    path = tmp_path / "private"
+    project = holderkit.create("Research", workspace=path)
+    project.close()
+    moved = tmp_path / "moved"
+    path.rename(moved)
+    try:
+        path.symlink_to(moved, target_is_directory=True)
+    except OSError:
+        pytest.skip("Directory symlinks are unavailable")
+    with pytest.raises(ValueError, match="redirected"):
+        project.discard(confirm=True)
+    assert moved.is_dir()
+
+
+def test_discard_partial_cleanup_reports_remaining_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from holderkit import _publication
+
+    project = holderkit.create("Research", workspace=tmp_path / "private")
+    def fail(path: Path) -> None:
+        raise PermissionError("Fixture cleanup failure")
+    monkeypatch.setattr(shutil, "rmtree", fail)
+    with pytest.raises(RuntimeError, match="incomplete permanent cleanup remains"):
+        project.discard(confirm=True)
+    assert project.closed and not project.path.exists()
+    assert len(list(tmp_path.glob(".holder-kit-discard-*"))) == 1
 
 
 def test_create_reopen_retains_edits_and_context_lifecycle(tmp_path: Path) -> None:

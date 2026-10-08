@@ -97,6 +97,10 @@ rejected. Historical revisions predating durable project manifests are unsupport
 
 ## Reopen and close
 
+See [Publishing and finishing a project](publication.md) for explicit
+`push()`, publication previews and permanent `discard(confirm=True)`.
+Closing continues to retain all local work.
+
 ```python
 with holderkit.reopen("./research-copy") as project:
     print(project.cards.to_records())
