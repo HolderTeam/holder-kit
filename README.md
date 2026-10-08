@@ -15,7 +15,7 @@ Typical uses include:
 
 The base package exposes ordinary Python records and has no data-science dependencies. pandas and NetworkX integrations are available as optional extras.
 
-Work in a private workspace with its own local copy of your data:
+A typical workflow looks like this:
 
 ![AI generated image](docs/workflow.png)
 
