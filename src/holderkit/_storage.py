@@ -9,7 +9,6 @@ import shutil
 import stat
 import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -20,37 +19,6 @@ if TYPE_CHECKING:
     from .data import Project
 
 _MARKER = ".holder-kit.json"
-
-
-@dataclass(frozen=True, slots=True)
-class Workspace:
-    """One private project and its context. Closing retains all local edits.
-
-    Project, source, ref and revision describe initialization, not a live view of
-    subsequent commits. Use context for the existing entity and analysis APIs.
-    """
-
-    path: Path
-    context: Context
-    project: Project
-    source: str | None
-    ref: str | None
-    revision: str
-
-    @property
-    def closed(self) -> bool:
-        return self.context.closed
-
-    def close(self) -> None:
-        self.context.close()
-
-    def __enter__(self) -> Workspace:
-        if self.closed:
-            raise RuntimeError("Holder workspace is closed")
-        return self
-
-    def __exit__(self, *exc_info: object) -> None:
-        self.close()
 
 
 def _default_parent() -> Path:
@@ -216,7 +184,7 @@ def _checkout_safe(root: Path) -> None:
 
 def _finish(
     path: Path, context: Context, project: Project, source: str | None, ref: str | None
-) -> Workspace:
+) -> Project:
     root = Path(project.root_path)
     relative = root.relative_to(path).as_posix()
     _private_tree(path)
@@ -234,10 +202,12 @@ def _finish(
     temporary = path / (_MARKER + ".tmp")
     temporary.write_text(json.dumps(marker, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path / _MARKER)
-    return Workspace(path, context, project, source, ref, revision)
+    project._owns_context = True
+    project._path = path
+    return project
 
 
-def create(name: str, *, workspace: os.PathLike[str] | str | None = None) -> Workspace:
+def create(name: str, *, workspace: os.PathLike[str] | str | None = None) -> Project:
     """Create one fresh private project. An existing destination is never reused."""
     from . import Context
 
@@ -263,7 +233,7 @@ def clone(
     *,
     workspace: os.PathLike[str] | str | None = None,
     ref: str | None = None,
-) -> Workspace:
+) -> Project:
     """Clone committed remote data into a private checkout and reconstructed DB.
 
     ref may be a branch, tag or commit available in the clone. No pull/reset or
@@ -352,7 +322,9 @@ def clone(
         _git("-C", str(root), "checkout", "--detach", selected)
         _private_tree(path)
         _checkout_safe(root)
-        project = Project._from_native(context._context.import_project(str(root)))
+        project = Project._from_native(
+            context._context.import_project(str(root)), context._context
+        )
         if Path(project.root_path) != root:
             raise ValueError("Clone must reconstruct exactly one private project")
         return _finish(path, context, project, source, ref)
@@ -363,7 +335,7 @@ def clone(
         raise
 
 
-def reopen(workspace: os.PathLike[str] | str) -> Workspace:
+def reopen(workspace: os.PathLike[str] | str) -> Project:
     """Reopen a completed Kit workspace without cloning or resetting its edits."""
     from . import Context
 
@@ -420,10 +392,13 @@ def reopen(workspace: os.PathLike[str] | str) -> Workspace:
             or Path(projects[0].root_path) != root
         ):
             raise ValueError("Workspace database does not match its private project")
-        return Workspace(path, context, projects[0], source, ref, revision)
+        project = projects[0]
+        project._owns_context = True
+        project._path = path
+        return project
     except BaseException:
         context.close()
         raise
 
 
-__all__ = ["Workspace", "create", "clone", "reopen"]
+__all__ = ["create", "clone", "reopen"]

@@ -28,21 +28,20 @@ A typical workflow looks like this:
 ```python
 import holderkit
 
-with holderkit.create("Research") as lab:
-    card = lab.context.create_card(
-        lab.project.project_id,
+with holderkit.create("Research") as project:
+    card = project.create_card(
         "Interesting question",
         "Something worth investigating.",
     )
 
-    print(lab.context.cards.to_records(include_content=True))
+    print(project.cards.to_records(include_content=True))
 ```
 
 Or clone an existing Holder project and explore its cards:
 
 ```python
-with holderkit.clone("git@example.org:research.git") as lab:
-    for card in lab.context.cards.to_records(include_content=True):
+with holderkit.clone("git@example.org:research.git") as project:
+    for card in project.cards.to_records(include_content=True):
         print(card["title"], card["content"])
 ```
 

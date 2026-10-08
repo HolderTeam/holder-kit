@@ -9,17 +9,15 @@ import holderkit
 def main() -> None:
     with TemporaryDirectory(prefix="holder-kit-workspace-") as temporary:
         path = Path(temporary) / "research"
-        with holderkit.create("Research", workspace=path) as lab:
-            card = lab.context.create_card(
-                lab.project.project_id, "Observation", "Imported measurement"
-            )
-            lab.context.tags.add(card.card_id, "research")
-            print("Workspace:", lab.path)
-            print("Project:", lab.project.project_id)
-            print("Initial revision:", lab.revision)
-        with holderkit.reopen(path) as lab:
-            lab.context.update_card(card.card_id, "Reviewed measurement\n\n#research")
-            records = lab.context.cards.to_records(include_content=True)
+        with holderkit.create("Research", workspace=path) as project:
+            card = project.create_card("Observation", "Imported measurement")
+            project.tags.add(card.card_id, "research")
+            print("Saved project:", project.path)
+            print("Project:", project.project_id)
+            print("Initial revision:", project.revision)
+        with holderkit.reopen(path) as project:
+            project.update_card(card.card_id, "Reviewed measurement\n\n#research")
+            records = project.cards.to_records(include_content=True)
         print("Detached records after close:", records)
 
 

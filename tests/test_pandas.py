@@ -78,6 +78,7 @@ def test_card_dataframes_distinguish_unrequested_and_empty_content(
         metadata = context.cards.to_dataframe()
         complete = context.cards.to_dataframe(include_content=True)
         projects = context.projects.to_dataframe()
+        project_created_at = project.created_at
 
     assert "content" not in metadata.columns
     empty_row = complete.loc[complete["card_id"] == empty.card_id].iloc[0]
@@ -98,7 +99,7 @@ def test_card_dataframes_distinguish_unrequested_and_empty_content(
         parent.created_at, unit="s", tz="UTC"
     )
     assert projects.iloc[0]["created_at"] == pd.Timestamp(
-        project.created_at, unit="s", tz="UTC"
+        project_created_at, unit="s", tz="UTC"
     )
     assert _dtypes(metadata) == CARD_METADATA_DTYPES
     assert _dtypes(projects) == PROJECT_DTYPES

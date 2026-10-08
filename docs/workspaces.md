@@ -18,11 +18,11 @@ Clone requires a Core build with project import support. Older builds raise
 ```python
 import holderkit
 
-with holderkit.create("Research", workspace="./research-lab") as lab:
-    card = lab.context.create_card(
-        lab.project.project_id, "Imported observation", "Measurements from Python",
+with holderkit.create("Research", workspace="./research-project") as project:
+    card = project.create_card(
+        "Imported observation", "Measurements from Python",
     )
-    print(lab.path, lab.project.root_path, lab.revision)
+    print(project.path, project.root_path, project.revision)
 ```
 
 `workspace` is the new destination directory. It must not exist, even as an empty
@@ -33,11 +33,17 @@ or the platform default: `$XDG_DATA_HOME/holder-kit/workspaces` (normally
 `%LOCALAPPDATA%/HolderKit/workspaces` on Windows. The base API needs neither pandas
 nor NetworkX.
 
-`Workspace.context` exposes the existing project/card/connection/tag/milestone
-and analysis APIs. `Workspace.project` is the detached project snapshot from
-opening the workspace. Each workspace supports exactly one project;
-creating additional projects through the low-level context makes it ineligible
-for managed reopening.
+`create()`, `clone()` and `reopen()` return a live `Project`. Work directly with
+`project.create_card()`, `project.cards`, `project.connections`, `project.tags`,
+`project.milestones`, `project.to_dataframes()` and `project.to_networkx()`.
+These methods select the project automatically; no project ID argument is needed.
+Each managed storage directory contains exactly one project.
+
+Project properties read current state. `project.revision` reads the current Git
+HEAD; `project.remote_url` reads the current origin remote. `project.to_record()`
+returns detached descriptive values when you need a snapshot. After closing,
+`project_id`, `path` and `closed` remain available; reads and edits requiring
+current state raise `RuntimeError`.
 
 Each workspace stores a completion marker at `.holder-kit.json`, its private
 database at `data/server/holder.db`, and one checkout under `data/projects/`.
@@ -52,12 +58,12 @@ with holderkit.clone(
     "git@example.org:research.git",
     workspace="./research-copy",
     ref="main",
-) as lab:
-    records = lab.context.cards.to_records(include_content=True)
+) as project:
+    records = project.cards.to_records(include_content=True)
     # Optional extras use the same reconstructed records:
-    tables = lab.context.to_dataframes()
-    graph = lab.context.to_networkx()
-    print(lab.source, lab.ref, lab.revision)
+    tables = project.to_dataframes()
+    graph = project.to_networkx()
+    print(project.remote_url, project.revision)
 ```
 
 Sources must be explicit HTTPS, SSH (including SCP-style SSH), or `git://`
@@ -92,16 +98,16 @@ rejected. Historical revisions predating durable project manifests are unsupport
 ## Reopen and close
 
 ```python
-with holderkit.reopen("./research-copy") as lab:
-    print(lab.context.cards.to_records())
+with holderkit.reopen("./research-copy") as project:
+    print(project.cards.to_records())
 ```
 
 Reopen accepts a completed Kit workspace marker, not an arbitrary Holder Home or
 project directory. It validates paths and the single recorded project before
-returning its context. It does not clone, fetch, pull, reset or discard edits.
+returning a Project. It does not clone, fetch, pull, reset or discard edits.
 The initialized `source`, requested `ref`, and selected `revision` remain recorded
-in the marker; `revision` is not a live view of later local commits. Use ordinary
-Git inspection of `lab.project.root_path` to review current history.
+in the marker as initialization provenance. The public `project.revision`
+property reads current HEAD, including later local commits.
 
 `close()` and context-manager exit release the native context and retain the
 workspace, including edits made before an exception. Entity mutations retain
@@ -119,6 +125,12 @@ deliberately after inspecting it, or choose a new destination for retry.
 
 `holderkit.open(data_dir)` remains the low-level embedded API; managed entry
 points do not fall back to it on an arbitrary Home.
+
+Projects returned by `Context.create_project()` and `Context.projects.list()`
+are also live and select their own cards and exports. They borrow the context:
+closing such a Project closes that handle only, while closing the Context makes
+all its project handles unusable. Managed Projects own their context and release
+it on close. Card objects and exported records/tables/graphs remain detached.
 
 For a runnable example with an explicit temporary directory and reopening, see
 [`reopen_project.py`](../examples/reopen_project.py).

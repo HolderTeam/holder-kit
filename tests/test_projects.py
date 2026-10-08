@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shlex
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
@@ -19,6 +20,137 @@ def git(root: Path, *args: str) -> str:
     return subprocess.check_output(
         ["git", "-C", str(root), *args], text=True, stderr=subprocess.PIPE
     ).strip()
+
+
+def test_project_properties_read_current_state_and_records_are_detached(
+    tmp_path: Path,
+) -> None:
+    with holderkit.create("Original", workspace=tmp_path / "private") as project:
+        assert isinstance(project, holderkit.Project)
+        assert not hasattr(project, "context")
+        assert not hasattr(project, "project")
+        original = project.to_record()
+        # Simulate another Holder writer updating the projection. Production
+        # reads must continue through Core, rather than retaining opening values.
+        with sqlite3.connect(project.path / "data/server/holder.db") as database:
+            database.execute(
+                "UPDATE projects SET name = ?, updated_at = ?, git_provider = ? WHERE project_id = ?",
+                ("Renamed", original["updated_at"] + 10, "example", project.project_id),
+            )
+        assert project.name == "Renamed"
+        assert project.updated_at == original["updated_at"] + 10
+        assert project.git_provider == "example"
+        assert project.to_record()["name"] == "Renamed"
+        assert original["name"] == "Original"
+        assert original["git_provider"] is None
+        assert project.created_datetime.tzinfo is not None
+        before = project.revision
+        card = project.create_card("Observation", "Body")
+        assert project.revision != before
+        project.update_card(card.card_id, "Changed")
+        after = project.revision
+        path = project.path
+        identity = project.project_id
+    assert project.closed and project.path == path and project.project_id == identity
+    assert git(Path(original["root_path"]), "rev-parse", "HEAD") == after
+    with pytest.raises(RuntimeError, match="closed"):
+        project.name
+    with pytest.raises(RuntimeError, match="closed"):
+        project.to_record()
+    with pytest.raises(RuntimeError, match="closed"):
+        project.revision
+
+
+def test_project_operations_are_scoped_in_a_shared_context(tmp_path: Path) -> None:
+    with holderkit.open(tmp_path / "shared") as context:
+        first = context.create_project("First")
+        second = context.create_project("Second")
+        a = first.create_card("One", "First body")
+        b = second.create_card("Two", "Second body")
+        first.tags.add(a.card_id, "science")
+        second.tags.add(b.card_id, "other")
+        second_body = second.get_card_content(b.card_id)
+        milestone = first.milestones.add(a.card_id, 100)[0]
+        first.milestones.update(
+            a.card_id, milestone["milestone_id"], {"description": "Review"}
+        )
+        assert first.milestones.in_range(0, 200)[0]["description"] == "Review"
+        assert [card.card_id for card in first.list_cards()] == [a.card_id]
+        assert first.cards.to_records()[0]["project_id"] == first.project_id
+        assert first.tags.cards_with_tag("science")[0]["card_id"] == a.card_id
+        assert first.tags.project_counts()[0]["count"] == 1
+        assert len(first.milestones.to_records()) == 1
+        # Core allows an outgoing connection to a card in another project.
+        first.connections.add(a.card_id, b.card_id, "related")
+        assert first.connections.to_records()[0]["to_card_id"] == b.card_id
+        tables = first.to_dataframes(include_content=True)
+        graph = first.to_networkx(include_content=True)
+        assert tables["projects"]["name"].tolist() == ["First"]
+        assert tables["cards"]["card_id"].tolist() == [a.card_id]
+        assert tables["tags"]["tag"].tolist() == ["science"]
+        assert first.cards.to_dataframe().shape[0] == 1
+        assert first.connections.to_dataframe().shape[0] == 1
+        assert first.tags.to_dataframe().shape[0] == 1
+        assert first.milestones.to_dataframe().shape[0] == 1
+        assert graph.has_edge(a.card_id, b.card_id)
+        for operation in (
+            lambda: first.get_card_content(b.card_id),
+            lambda: first.update_card(b.card_id, "Wrong project"),
+            lambda: first.create_card("Child", parent_card_id=b.card_id),
+            lambda: first.tags.add(b.card_id, "Wrong project"),
+            lambda: first.tags.remove(b.card_id, "other"),
+            lambda: first.tags.list(b.card_id),
+            lambda: first.tags.list_editable(b.card_id),
+            lambda: first.milestones.add(b.card_id, 200),
+            lambda: first.milestones.list(b.card_id),
+            lambda: first.milestones.remove(b.card_id, milestone["milestone_id"]),
+            lambda: first.milestones.update(
+                b.card_id, milestone["milestone_id"], {"description": "Wrong"}
+            ),
+            lambda: first.connections.add(b.card_id, a.card_id, "related"),
+            lambda: first.connections.remove(b.card_id, a.card_id, "related"),
+        ):
+            with pytest.raises(ValueError, match="belong"):
+                operation()
+        assert second.get_card_content(b.card_id) == second_body
+        first.connections.remove(a.card_id, b.card_id, "related")
+        first.milestones.remove(a.card_id, milestone["milestone_id"])
+        first.tags.remove(a.card_id, "science")
+        assert first.connections.to_records() == []
+        assert first.milestones.to_records() == []
+        assert first.tags.to_records() == []
+    assert tables["cards"].shape[0] == 1 and graph.number_of_edges() == 1
+
+
+def test_borrowed_projects_close_without_closing_the_context(tmp_path: Path) -> None:
+    with holderkit.open(tmp_path / "shared") as context:
+        first = context.create_project("First")
+        second = context.create_project("Second")
+        collection = first.cards
+        with first:
+            first.create_card("Card")
+        assert first.closed and not context.closed and not second.closed
+        with pytest.raises(RuntimeError, match="closed"):
+            collection.to_records()
+        second.create_card("Still usable")
+        reopened_handle = context.list_projects()[0]
+        assert not reopened_handle.closed
+        assert len(context.projects.to_records()) == 2
+    assert second.closed and reopened_handle.closed
+
+
+def test_managed_project_keeps_native_context_alive(tmp_path: Path) -> None:
+    import gc
+
+    project = holderkit.create("Lifetime", workspace=tmp_path / "private")
+    cards = project.cards
+    identity = project.project_id
+    del project
+    gc.collect()
+    assert cards.to_records() == []
+    cards._project.close()
+    with holderkit.reopen(tmp_path / "private") as reopened:
+        assert reopened.project_id == identity
 
 
 @dataclass
@@ -46,7 +178,7 @@ def remote(tmp_path: Path) -> Iterator[Remote]:
         second = context.create_card(project.project_id, "Question", "Other body")
         context.connections.add(first.card_id, second.card_id, "related")
         context.milestones.add(first.card_id, 100, description="Review")
-    source = Path(project.root_path)
+        source = Path(project.root_path)
     bare = tmp_path / "research.git"
     subprocess.run(
         ["git", "clone", "--bare", str(source), str(bare)],
@@ -99,22 +231,19 @@ def test_create_reopen_retains_edits_and_context_lifecycle(tmp_path: Path) -> No
     path = tmp_path / "private"
     with holderkit.create("Research", workspace=path) as workspace:
         assert workspace.path == path
-        assert workspace.source is None
-        assert workspace.ref is None
+        assert workspace.remote_url is None
         assert len(workspace.revision) == 40
-        card = workspace.context.create_card(
-            workspace.project.project_id, "Imported data", "Body"
-        )
+        card = workspace.create_card("Imported data", "Body")
         initial_revision = workspace.revision
     assert workspace.closed
     assert (path / "data/server/holder.db").is_file()
     with holderkit.reopen(path) as reopened:
-        assert reopened.project.project_id == workspace.project.project_id
-        assert reopened.context.get_card_content(card.card_id) == "Body"
+        assert reopened.project_id == workspace.project_id
+        assert reopened.get_card_content(card.card_id) == "Body"
         assert reopened.revision == initial_revision
-        reopened.context.update_card(card.card_id, "Changed")
+        reopened.update_card(card.card_id, "Changed")
     with holderkit.reopen(path) as reopened:
-        assert reopened.context.get_card_content(card.card_id) == "Changed"
+        assert reopened.get_card_content(card.card_id) == "Changed"
     with pytest.raises(RuntimeError, match="closed"):
         workspace.__enter__()
     workspace.close()
@@ -140,11 +269,11 @@ def test_clone_preserves_identity_and_reconstructs_analysis(
     }
     path = tmp_path / "private"
     with holderkit.clone(remote.url, workspace=path) as workspace:
-        assert workspace.source == remote.url
+        assert workspace.remote_url == remote.url
         assert workspace.revision == remote.revision
-        assert workspace.project.project_id == remote.project_id
-        assert Path(workspace.project.root_path) == path / "data/projects/project"
-        context = workspace.context
+        assert workspace.project_id == remote.project_id
+        assert Path(workspace.root_path) == path / "data/projects/project"
+        context = workspace
         assert context.get_card_content(remote.card_id) == "Original body #science"
         assert context.tags.list(remote.card_id) == ["science"]
         assert context.milestones.list(remote.card_id)[0]["description"] == "Review"
@@ -161,11 +290,11 @@ def test_clone_preserves_identity_and_reconstructs_analysis(
     }
     assert git(remote.bare, "rev-parse", "HEAD") == remote.revision
     with holderkit.reopen(path) as reopened:
-        assert reopened.context.get_card_content(remote.card_id) == "Private edit"
+        assert reopened.get_card_content(remote.card_id) == "Private edit"
     # Core can also recover the private projection after it is deliberately lost.
     (path / "data/server/holder.db").unlink()
     with holderkit.reopen(path) as recovered:
-        assert recovered.context.get_card_content(remote.card_id) == "Private edit"
+        assert recovered.get_card_content(remote.card_id) == "Private edit"
 
 
 def test_clone_selected_tag_and_remote_branch(remote: Remote, tmp_path: Path) -> None:
@@ -175,7 +304,10 @@ def test_clone_selected_tag_and_remote_branch(remote: Remote, tmp_path: Path) ->
         with holderkit.clone(
             remote.url, workspace=tmp_path / ref, ref=ref
         ) as workspace:
-            assert workspace.ref == ref
+            assert (
+                json.loads((workspace.path / ".holder-kit.json").read_text())["ref"]
+                == ref
+            )
             assert workspace.revision == remote.revision
 
 
@@ -300,7 +432,7 @@ def test_clone_rejects_symlink_before_checkout(remote: Remote, tmp_path: Path) -
 
 def test_reopen_rejects_git_alternates_and_encryption(tmp_path: Path) -> None:
     with holderkit.create("Private", workspace=tmp_path / "private") as workspace:
-        root = Path(workspace.project.root_path)
+        root = Path(workspace.root_path)
     alternates = root / ".git/objects/info/alternates"
     alternates.parent.mkdir(exist_ok=True)
     alternates.write_text("/outside/objects\n")
@@ -361,8 +493,5 @@ def test_checkout_does_not_run_configured_filters(
     )
     monkeypatch.setenv("XDG_CONFIG_HOME", str(config_dir.parent))
     with holderkit.clone(remote.url, workspace=tmp_path / "private") as workspace:
-        assert (
-            workspace.context.get_card_content(remote.card_id)
-            == "Original body #science"
-        )
+        assert workspace.get_card_content(remote.card_id) == "Original body #science"
     assert not marker.exists()

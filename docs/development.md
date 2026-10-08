@@ -76,7 +76,10 @@ use temporary contexts and bare repositories, never a live Holder project.
 
 `Context` owns the native `holder_context`; close it explicitly or use a context
 manager. Native runtime failures raise `holderkit.HolderError`, and invalid core
-arguments raise `ValueError`. `Project` and `Card` are frozen, slotted dataclasses.
+arguments raise `ValueError`. `Project` is a live interface to one project;
+its properties read current state. `Card` remains a frozen, slotted snapshot.
+Use `Project.to_record()` for detached project values. Managed Projects own
+their context; Projects obtained from a Context borrow it and close independently.
 
 Records, DataFrames and graphs are detached data. They remain usable after the
 context closes, and editing them does not write back to Holder. Card exports

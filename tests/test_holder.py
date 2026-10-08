@@ -132,7 +132,7 @@ def test_typed_collections_and_records_are_detached(tmp_path: Path) -> None:
     )
     context.create_card(second_project.project_id, "Other", "other body")
 
-    projects = context.projects.list()
+    projects = [project.to_record() for project in context.projects.list()]
     cards = context.cards.list()
     project_records = context.projects.to_records()
     metadata_records: list[holderkit.CardMetadataRecord] = context.cards.to_records(
@@ -143,7 +143,7 @@ def test_typed_collections_and_records_are_detached(tmp_path: Path) -> None:
     )
     context.close()
 
-    assert {project.name for project in projects} == {"First", "Second"}
+    assert {project["name"] for project in projects} == {"First", "Second"}
     assert {card.content for card in cards} == {
         "parent body",
         "child body",

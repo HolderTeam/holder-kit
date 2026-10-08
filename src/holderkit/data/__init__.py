@@ -1,4 +1,4 @@
-"""Detached Holder data types organised by domain."""
+"""Holder domain types and detached record contracts."""
 
 from .card import (
     CARD_METADATA_RECORD_FIELDS,

@@ -15,17 +15,13 @@ sections. The base package is enough for creating data and exporting records.
 ```python
 import holderkit
 
-lab = holderkit.create("Research")
-holder = lab.context
-project = lab.project
+project = holderkit.create("Research")
 
-evidence = holder.create_card(
-    project.project_id,
+evidence = project.create_card(
     "Read paper",
     "Collect evidence for the report.",
 )
-report = holder.create_card(
-    project.project_id,
+report = project.create_card(
     "Write report",
     "Summarise the findings.",
 )
@@ -33,9 +29,9 @@ report = holder.create_card(
 print(evidence.title)
 ```
 
-The following sections use `holder` to work with this project. To analyse an
-existing project instead, start with `lab = holderkit.clone(remote_url)` and use
-the same context and analysis methods.
+The following sections use `project` to work with this project. To analyse an
+existing project instead, start with `project = holderkit.clone(remote_url)` and use
+the same analysis methods.
 
 ## Add a connection, a tag and a milestone
 
@@ -44,11 +40,11 @@ from datetime import datetime, timezone
 
 review_at = int(datetime(2026, 10, 12, 9, tzinfo=timezone.utc).timestamp())
 
-holder.connections.add(
+project.connections.add(
     report.card_id, evidence.card_id, "depends_on", "Needs evidence"
 )
-holder.tags.add(evidence.card_id, "todo")
-holder.milestones.add(evidence.card_id, review_at)
+project.tags.add(evidence.card_id, "todo")
+project.milestones.add(evidence.card_id, review_at)
 ```
 
 The explicit connection points from the report to its evidence. Connections
@@ -63,22 +59,22 @@ and mutation limits.
 ## Export ordinary Python records
 
 ```python
-records = holder.cards.to_records(
-    project.project_id, include_content=True
+records = project.cards.to_records(
+    include_content=True
 )
 
 for card in records:
     print(card["title"], card["content"])
 ```
 
-Records contain standard-library values and remain usable after the context
+Records contain standard-library values and remain usable after the project
 closes. Card exports omit bodies by default; `include_content=True` adds the
 `content` field. Changing an exported dictionary does not update Holder.
 
 ## Analyse the project with pandas
 
 ```python
-tables = holder.to_dataframes(project.project_id, include_content=True)
+tables = project.to_dataframes(include_content=True)
 
 cards = tables["cards"]
 projects = tables["projects"]
@@ -104,7 +100,7 @@ Exporting the tables makes separate core reads rather than an atomic snapshot.
 ## Explore the connection graph
 
 ```python
-graph = holder.to_networkx(project.project_id)
+graph = project.to_networkx()
 
 print("Cards:", graph.number_of_nodes())
 print("Connections:", graph.number_of_edges())
@@ -120,7 +116,7 @@ Editing the graph does not modify Holder.
 When you have finished, close the project:
 
 ```python
-lab.close()
+project.close()
 ```
 
 Your edits are saved locally, and exported records, tables and graphs remain

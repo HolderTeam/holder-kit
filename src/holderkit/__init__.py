@@ -54,6 +54,12 @@ class Context:
     def __init__(self, data_dir: os.PathLike[str] | str) -> None:
         self._context = _native.Context(os.fspath(data_dir), _schema_sql())
 
+    @classmethod
+    def _from_native(cls, context: _native.Context) -> Context:
+        instance = cls.__new__(cls)
+        instance._context = context
+        return instance
+
     @property
     def closed(self) -> bool:
         return self._context.closed
@@ -124,7 +130,7 @@ class Context:
         return records_to_networkx(cards, self.connections._records_from_cards(cards))
 
     def create_project(self, name: str) -> Project:
-        return Project._from_native(self._context.create_project(name))
+        return Project._from_native(self._context.create_project(name), self._context)
 
     def list_projects(self) -> list[Project]:
         return self.projects.list()
@@ -168,11 +174,11 @@ def open(data_dir: os.PathLike[str] | str) -> Context:
     return Context(data_dir)
 
 
-from .workspace import Workspace, clone, create, reopen
+from ._storage import clone, create, reopen
 
 
 __all__ = [
-    "Workspace", "clone", "create", "reopen",
+    "clone", "create", "reopen",
     "MILESTONE_RECORD_FIELDS", "PROJECT_MILESTONE_RECORD_FIELDS", "MilestoneCollection",
     "MilestoneRecord", "ProjectMilestoneRecord", "MilestoneUpdate",
     "TAG_RECORD_FIELDS", "TagCollection", "ProjectTagRecord", "TaggedCardRecord",

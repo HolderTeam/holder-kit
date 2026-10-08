@@ -2,8 +2,11 @@
 
 Holder Kit record exports are plain dictionaries with stable field names and
 standard-library types. They own no native resources and remain readable,
-serialisable, and safe to pass elsewhere after their originating `Context` is
-closed.
+serialisable, and safe to pass elsewhere after their originating `Project` or
+`Context` is closed. `Project` itself is live: use `project.to_record()` to
+capture descriptive values before closing. Its card, connection, tag, milestone,
+DataFrame and graph exports automatically select that project's data. The
+advanced Context methods also accept explicit project IDs as described below.
 
 Identifiers are opaque strings. Timestamps are integer Unix seconds exactly as
 reported by libholder; the typed models additionally expose timezone-aware UTC

@@ -4,12 +4,10 @@ import holderkit
 
 
 def main() -> None:
-    with holderkit.create("Research") as lab:
-        card = lab.context.create_card(
-            lab.project.project_id, "Observation", "Measurements from Python"
-        )
-        lab.context.tags.add(card.card_id, "research")
-        records = lab.context.cards.to_records(include_content=True)
+    with holderkit.create("Research") as project:
+        card = project.create_card("Observation", "Measurements from Python")
+        project.tags.add(card.card_id, "research")
+        records = project.cards.to_records(include_content=True)
     for record in records:
         print(record["title"], record["content"])
 
