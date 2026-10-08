@@ -19,9 +19,9 @@ A typical workflow looks like this:
 
 ![AI generated image](docs/workflow.png)
 
-1. Create a project, or clone one from a Git remote.
-2. Import data, edit cards and explore the results with Python.
-3. Close the workspace and reopen it later to continue. Your edits are saved locally.
+1. You make a new project, or clone an existing one.
+2. You do work and analysis.
+3. You push your experiment, or discard it.
 
 ## A first example
 
