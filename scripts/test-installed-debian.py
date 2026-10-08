@@ -39,4 +39,10 @@ with tempfile.TemporaryDirectory() as directory:
         assert any(card["content"] == "After" for card in records)
         context.connections.remove(second.card_id, first.card_id, "depends_on")
         assert context.connections.to_records(project.project_id) == []
+with tempfile.TemporaryDirectory() as directory:
+    workspace = Path(directory) / "private"
+    with holderkit.create("Installed workspace", workspace=workspace) as lab:
+        card = lab.context.create_card(lab.project.project_id, "Retained", "Saved locally")
+    with holderkit.reopen(workspace) as lab:
+        assert lab.context.get_card_content(card.card_id) == "Saved locally"
 print(f"Installed python3-holder-kit passed with libholder0 {runtime_version}")
