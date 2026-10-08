@@ -9,7 +9,7 @@ from .card import (
     CardRecord,
     CompleteCardRecord,
 )
-from .project import PROJECT_RECORD_FIELDS, Project, ProjectRecord
+from .project import PROJECT_RECORD_FIELDS, Project, ProjectRecord, PushPreview, PushResult, DiscardPreview
 from .connection import CONNECTION_RECORD_FIELDS, ConnectionRecord
 from .milestone import (
     MILESTONE_RECORD_FIELDS, PROJECT_MILESTONE_RECORD_FIELDS,
@@ -33,4 +33,5 @@ __all__ = [
     "CompleteCardRecord",
     "Project",
     "ProjectRecord",
+    "PushPreview", "PushResult", "DiscardPreview",
 ]

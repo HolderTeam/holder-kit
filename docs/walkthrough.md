@@ -113,7 +113,13 @@ connection kinds identify edges, allowing multiple kinds between the same
 two cards. For this example, the graph has two cards and one connection.
 Editing the graph does not modify Holder.
 
-When you have finished, close the project:
+To publish your experiment, push it to a new branch in a repository you can write
+to: `project.push(remote_url=remote_url, branch="experiments/results")`.
+You can continue editing and push to that branch again. See
+[Publishing and finishing a project](publication.md) for reviewing a push and
+deliberately discarding local work with `project.discard(confirm=True)`.
+
+To keep your work locally, close the project:
 
 ```python
 project.close()

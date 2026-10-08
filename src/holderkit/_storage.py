@@ -335,10 +335,8 @@ def clone(
         raise
 
 
-def reopen(workspace: os.PathLike[str] | str) -> Project:
-    """Reopen a completed Kit workspace without cloning or resetting its edits."""
-    from . import Context
-
+def _managed_marker(workspace: os.PathLike[str] | str) -> tuple[Path, Path, dict[str, Any]]:
+    """Validate managed storage without opening a database."""
     path = Path(workspace).expanduser()
     if path.is_symlink():
         raise ValueError("Workspace must not be a symlink")
@@ -383,6 +381,14 @@ def reopen(workspace: os.PathLike[str] | str) -> Project:
         or not re.fullmatch(r"[0-9a-f]{40}", revision)
     ):
         raise ValueError("Invalid workspace source revision")
+    return path, root, marker
+
+
+def reopen(workspace: os.PathLike[str] | str) -> Project:
+    """Reopen a completed Kit workspace without cloning or resetting its edits."""
+    from . import Context
+
+    path, root, marker = _managed_marker(workspace)
     context = Context(path / "data")
     try:
         projects = context.list_projects()

@@ -26,6 +26,7 @@ EXAMPLES = {
     "tags": "tag_analysis",
     "milestones": "milestone_analysis",
     "make_project": "make_project",
+    "finish_project": "finish_project",
 }
 HELP = """Holder Kit developer commands
 
@@ -39,7 +40,7 @@ Commands:
   typecheck [args]         Run mypy using the installed development environment
   wheel [BuildType]        Build a wheel into out/make/wheels
   examples [name]          Run all examples, or lifecycle, records, pandas, graph,
-                           tags, milestones, make_project
+                           tags, milestones, make_project, finish_project
   setup-core              Prepare a pinned checkout in build/deps/holder-core
   sdk [core-ref]           Resolve and fetch an SDK (default latest-green)
   clean                   Remove build/make and out/make only

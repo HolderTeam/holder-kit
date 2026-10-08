@@ -48,6 +48,11 @@ with holderkit.clone("git@example.org:research.git") as project:
 Replace the example URL with your project's Git remote. Holder Kit chooses
 local storage automatically. These examples need Git installed.
 
+When your experiment is ready, publish it while the project is open with
+`project.push(remote_url="git@example.org:research.git", branch="experiments/results")`.
+Use `project.close()` to keep your work, or `project.discard(confirm=True)` to
+remove it locally. See [Publishing and finishing a project](docs/publication.md).
+
 Follow the [walkthrough](docs/walkthrough.md) to create connected cards, add tags
 and milestones, and analyse detached records with pandas and NetworkX.
 
@@ -84,13 +89,14 @@ The repository includes examples covering:
 - connection graphs;
 - tag analysis;
 - milestone and calendar analysis;
-- creating projects and retaining local edits.
+- creating projects, retaining local edits and explicitly finishing an experiment.
 
 See the [`examples/`](examples/) directory.
 
 ## Documentation
 
 - [Walkthrough](docs/walkthrough.md)
+- [Publishing and finishing a project](docs/publication.md)
 - [Detached record contracts](docs/record-contracts.md)
 - [Advanced: storage and reopening](docs/workspaces.md)
 - [Building from source](docs/building.md)

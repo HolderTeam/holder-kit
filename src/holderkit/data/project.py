@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping, TypedDict
 
@@ -67,6 +68,37 @@ def _project_record_from_native(record: Mapping[str, Any]) -> ProjectRecord:
         "git_provider": _optional_string(record["git_provider"]),
         "project_key_id": _optional_string(record["project_key_id"]),
     }
+
+
+@dataclass(frozen=True)
+class PushPreview:
+    """Detached publication target and commit, with a local dirty-state flag."""
+
+    remote_url: str
+    branch: str
+    revision: str
+    new_branch: bool
+    has_uncommitted_changes: bool
+
+
+@dataclass(frozen=True)
+class PushResult:
+    """Confirmed publication; the project remains open and locally retained."""
+
+    remote_url: str
+    branch: str
+    revision: str
+
+
+@dataclass(frozen=True)
+class DiscardPreview:
+    """Exact managed directory and potential losses from permanent disposal."""
+
+    path: Path
+    revision: str
+    has_unpublished_commits: bool
+    has_uncommitted_changes: bool
+    warnings: tuple[str, ...]
 
 
 class Project:
@@ -258,9 +290,46 @@ class Project:
         )
 
     def close(self) -> None:
+        """Release resources and retain all local work for reopening."""
         if self._owns_context:
             self._context.close()
         self._closed = True
+
+    def preview_push(self, *, branch: str, remote_url: str | None = None) -> PushPreview:
+        """Review committed publication to a named branch; does not push."""
+        from .._publication import preview_push
+
+        return preview_push(self, branch=branch, remote_url=remote_url)
+
+    def push(
+        self, *, branch: str, remote_url: str | None = None,
+        expected_revision: str | None = None,
+    ) -> PushResult:
+        """Publish committed work without closing, deleting or merging it.
+
+        The first push creates a new branch; later pushes to that destination
+        are fast-forward only. expected_revision can pin a reviewed preview.
+        """
+        from .._publication import push
+
+        return push(self, branch=branch, remote_url=remote_url,
+                    expected_revision=expected_revision)
+
+    def preview_discard(self) -> DiscardPreview:
+        """Review permanent removal of this local project, also after close."""
+        from .._publication import preview_discard
+
+        return preview_discard(self)
+
+    def discard(self, *, confirm: bool = False) -> None:
+        """Permanently remove managed local storage with explicit confirmation.
+
+        Remote branches and external assets are retained. Shared Context
+        projects cannot be discarded through this API.
+        """
+        from .._publication import discard
+
+        discard(self, confirm=confirm)
 
     def __enter__(self) -> Project:
         self._live_context()
@@ -283,4 +352,4 @@ class Project:
         return _project_record_from_native(record)
 
 
-__all__ = ["PROJECT_RECORD_FIELDS", "Project", "ProjectRecord"]
+__all__ = ["PROJECT_RECORD_FIELDS", "Project", "ProjectRecord", "PushPreview", "PushResult", "DiscardPreview"]

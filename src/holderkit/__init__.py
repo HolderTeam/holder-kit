@@ -37,6 +37,7 @@ from .data import (
     CompleteCardRecord,
     Project,
     ProjectRecord,
+    PushPreview, PushResult, DiscardPreview,
 )
 
 HolderError = _native.HolderError
@@ -201,5 +202,6 @@ __all__ = [
     "Project",
     "ProjectCollection",
     "ProjectRecord",
+    "PushPreview", "PushResult", "DiscardPreview",
     "open",
 ]
