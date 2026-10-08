@@ -67,7 +67,7 @@ advertise a default branch; choose your proposal branch name deliberately.
 ## Keep work or discard it
 
 `project.close()` and context-manager exit retain your work, including after
-an exception. See [Advanced: storage and reopening](workspaces.md) to return to
+an exception. See [Advanced: storage and reopening](storage.md) to return to
 it later. Neither closing nor pushing deletes anything.
 
 To deliberately remove the local project:

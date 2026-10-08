@@ -98,7 +98,7 @@ See the [`examples/`](examples/) directory.
 - [Walkthrough](docs/walkthrough.md)
 - [Publishing and finishing a project](docs/publication.md)
 - [Detached record contracts](docs/record-contracts.md)
-- [Advanced: storage and reopening](docs/workspaces.md)
+- [Advanced: storage and reopening](docs/storage.md)
 - [Building from source](docs/building.md)
 - [Development](docs/development.md)
 - [Packaging](docs/packaging.md)

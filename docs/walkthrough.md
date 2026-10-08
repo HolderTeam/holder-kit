@@ -126,7 +126,7 @@ project.close()
 ```
 
 Your edits are saved locally, and exported records, tables and graphs remain
-usable after closing. See [Advanced: storage and reopening](workspaces.md) for
+usable after closing. See [Advanced: storage and reopening](storage.md) for
 returning to saved work or choosing a storage directory.
 
 For more examples, see [`examples/`](../examples/). The
