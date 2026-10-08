@@ -121,4 +121,4 @@ deliberately after inspecting it, or choose a new destination for retry.
 points do not fall back to it on an arbitrary Home.
 
 For a runnable example with an explicit temporary directory and reopening, see
-[`private_workspace.py`](../examples/private_workspace.py).
+[`reopen_project.py`](../examples/reopen_project.py).
