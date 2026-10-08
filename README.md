@@ -15,16 +15,13 @@ Typical uses include:
 
 The base package exposes ordinary Python records and has no data-science dependencies. pandas and NetworkX integrations are available as optional extras.
 
-The private-workspace workflow starts like this:
+Work in a private workspace with its own local copy of your data:
 
 ![AI generated image](docs/workflow.png)
 
-1. You make a new project, or clone an existing one.
-2. You do work and analysis.
-3. Close and reopen the private workspace as needed.
-
-Managed create/remote-clone/reopen are available in the current source API.
-Proposal publication and disposal are later slices.
+1. Create a project, or clone one from a Git remote.
+2. Import data, edit cards and explore the results with Python.
+3. Close the workspace and reopen it later to continue. Your edits are saved locally.
 
 ## A first example
 
@@ -41,9 +38,17 @@ with holderkit.create("Research", workspace="./research-lab") as lab:
     print(card.title)
 ```
 
-See [Private workspaces](docs/workspaces.md) for clone/reopen, private storage,
-Git credentials and the required core import capability. The existing
-`holderkit.open(data_dir)` remains available for low-level embedded use.
+Use a new directory for `workspace`. Closing the block keeps your project and
+cards on disk. To continue working with them:
+
+```python
+with holderkit.reopen("./research-lab") as lab:
+    records = lab.context.cards.to_records(include_content=True)
+    print(records)
+```
+
+See [Private workspaces](docs/workspaces.md) to clone an existing project and
+learn where your data is stored.
 
 Follow the [walkthrough](docs/walkthrough.md) to create connected cards, add tags
 and milestones, and analyse detached records with pandas and NetworkX.
@@ -80,7 +85,8 @@ The repository includes examples covering:
 - pandas analysis;
 - connection graphs;
 - tag analysis;
-- milestone and calendar analysis.
+- milestone and calendar analysis;
+- creating and reopening private workspaces.
 
 See the [`examples/`](examples/) directory.
 
