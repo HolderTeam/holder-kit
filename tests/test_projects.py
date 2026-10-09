@@ -196,6 +196,32 @@ def remote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Remote]:
         check=True,
         capture_output=True,
     )
+    if sys.platform == "win32":
+        # Git for Windows' daemon can stall receive-pack and leave workers
+        # holding its stderr pipe open. Exercise real Git's SSH transport with
+        # a local shim instead; no credentials or external server are needed.
+        shim = tmp_path / "fixture-ssh.py"
+        shim.write_text(
+            "import pathlib, shlex, subprocess, sys\n"
+            "command = shlex.split(sys.argv[-1])\n"
+            "if len(command) != 2 or command[0] not in ('git-upload-pack', 'git-receive-pack'):\n"
+            "    sys.exit(1)\n"
+            f"base = pathlib.Path({str(tmp_path)!r})\n"
+            "repository = base / pathlib.PurePosixPath(command[1]).name\n"
+            "sys.exit(subprocess.call(['git', command[0], str(repository)], "
+            "stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer))\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv(
+            "GIT_SSH_COMMAND",
+            f"{shlex.quote(Path(sys.executable).as_posix())} {shlex.quote(shim.as_posix())}",
+        )
+        yield Remote(
+            "ssh://fixture@localhost/research.git", source, bare,
+            project.project_id, first.card_id, second.card_id,
+            git(source, "rev-parse", "HEAD"),
+        )
+        return
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
