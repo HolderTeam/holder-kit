@@ -10,7 +10,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 import pytest
 
@@ -166,11 +166,21 @@ class Remote:
 
 
 @pytest.fixture
-def remote(tmp_path: Path) -> Iterator[Remote]:
+def remote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Remote]:
     if not holderkit._native.PROJECT_IMPORT_SUPPORTED:
         pytest.skip(
             "Remote import needs the newer core API; use an explicit development source override"
         )
+    # Bound every Git client used by these disposable remotes, including Kit's
+    # subprocess calls. A stalled fixture must fail with the command identified
+    # rather than occupying a runner until the entire workflow times out.
+    original_run = subprocess.run
+
+    def bounded_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
+        kwargs.setdefault("timeout", 30)
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", bounded_run)
     with holderkit.open(tmp_path / "source") as context:
         project = context.create_project("Remote research")
         first = context.create_card(
