@@ -96,11 +96,11 @@ dependencies, ownership checks and failure behavior where relevant.
 ## Clone build requirements
 
 Clone uses Core's `holder_project_import` API. The release SDK and development
-source pins select `57a025f15b905bc1ec0ffeb7b433980d01634d36`, which provides it.
+source pins select `bd88c6d008a6d3cb5b427252aa010e96834bb058`, which provides it.
 To select and build that published SDK:
 
 ```sh
-./make.sh sdk 57a025f15b905bc1ec0ffeb7b433980d01634d36
+./make.sh sdk bd88c6d008a6d3cb5b427252aa010e96834bb058
 ./make.sh --sdk setup
 ```
 
