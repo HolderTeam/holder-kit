@@ -47,25 +47,34 @@ class ProjectCards(_ProjectCollection):
     @overload
     def __call__(
         self, *, batch_size: int = 256, include_content: Literal[False] = False,
+        tag: str | None = None, roots: bool = False, parent_card_id: str | None = None,
+        order: Literal["card_id", "updated"] | None = None,
     ) -> Iterator[builtins.list[CardMetadataRecord]]: ...
 
     @overload
     def __call__(
         self, *, batch_size: int = 256, include_content: Literal[True],
+        tag: str | None = None, roots: bool = False, parent_card_id: str | None = None,
+        order: Literal["card_id", "updated"] | None = None,
     ) -> Iterator[builtins.list[CompleteCardRecord]]: ...
 
     @overload
     def __call__(
         self, *, batch_size: int = 256, include_content: bool,
+        tag: str | None = None, roots: bool = False, parent_card_id: str | None = None,
+        order: Literal["card_id", "updated"] | None = None,
     ) -> Iterator[builtins.list[CardMetadataRecord] | builtins.list[CompleteCardRecord]]: ...
 
     def __call__(
         self, *, batch_size: int = 256, include_content: bool = False,
+        tag: str | None = None, roots: bool = False, parent_card_id: str | None = None,
+        order: Literal["card_id", "updated"] | None = None,
     ) -> Iterator[builtins.list[CardMetadataRecord] | builtins.list[CompleteCardRecord]]:
         """Lazily yield detached record batches; the last may be smaller.
 
         Metadata reads omit bodies and follow Core's recency order. Complete
-        reads follow card ID order. There is no snapshot across page reads.
+        reads follow card ID order, unless order is supplied. Tag and hierarchy
+        filters combine before pagination. There is no snapshot across page reads.
         """
         if isinstance(batch_size, bool) or not isinstance(batch_size, int):
             raise TypeError("batch_size must be a positive integer")
@@ -73,18 +82,50 @@ class ProjectCards(_ProjectCollection):
             raise ValueError("batch_size must be a positive integer")
         if not isinstance(include_content, bool):
             raise TypeError("include_content must be a bool")
+        if not isinstance(roots, bool):
+            raise TypeError("roots must be a bool")
+        for name, value in (("tag", tag), ("parent_card_id", parent_card_id)):
+            if value is not None and not isinstance(value, str):
+                raise TypeError(f"{name} must be a string")
+            if value == "":
+                raise ValueError(f"{name} must not be empty")
+        if roots and parent_card_id is not None:
+            raise ValueError("roots and parent_card_id cannot be combined")
+        if order is not None and order not in ("card_id", "updated"):
+            raise ValueError("order must be 'card_id' or 'updated'")
         self._project._live_context()
-        return self._batches(batch_size, include_content)
+        request: dict[str, Any] | None = None
+        if tag is not None or roots or parent_card_id is not None or order is not None:
+            if not _native.CARD_COLLECTION_SUPPORTED:
+                raise NotImplementedError(
+                    "Filtered card batches require a Core SDK with collection pagination support"
+                )
+            request = {
+                "view": "children" if parent_card_id is not None else "roots" if roots else "all",
+                "include_content": include_content,
+                "order": order or ("card_id" if include_content else "updated"),
+            }
+            if tag is not None:
+                request["tag"] = tag
+            if parent_card_id is not None:
+                request["parent_card_id"] = parent_card_id
+        return self._batches(batch_size, include_content, request)
 
     def _pages(
-        self, batch_size: int, include_content: bool,
+        self, batch_size: int, include_content: bool, collection_request: dict[str, Any] | None,
     ) -> Iterator[builtins.list[Mapping[str, Any]]]:
         limit = min(batch_size, _native.CARD_PAGE_MAX_LIMIT)
         cursor: str | None = None
         request: dict[str, Any] = {"view": "recent", "limit": limit}
+        if collection_request is not None:
+            collection_request = {**collection_request, "limit": limit}
         while True:
             context = self._project._live_context()
-            if include_content:
+            if collection_request is not None:
+                page = context.collection_cards_page(self._project.project_id, json.dumps(collection_request))
+                collection_request["cursor"] = page["next_cursor"]
+                finished = page["next_cursor"] is None
+            elif include_content:
                 page = context.list_complete_cards_page(self._project.project_id, cursor, limit)
                 cursor = page["next_cursor"]
                 finished = cursor is None
@@ -101,10 +142,10 @@ class ProjectCards(_ProjectCollection):
                 return
 
     def _batches(
-        self, batch_size: int, include_content: bool,
+        self, batch_size: int, include_content: bool, collection_request: dict[str, Any] | None,
     ) -> Iterator[builtins.list[CardMetadataRecord] | builtins.list[CompleteCardRecord]]:
         pending: builtins.list[Mapping[str, Any]] = []
-        for page in self._pages(batch_size, include_content):
+        for page in self._pages(batch_size, include_content, collection_request):
             pending.extend(page)
             while len(pending) >= batch_size:
                 records, pending = pending[:batch_size], pending[batch_size:]

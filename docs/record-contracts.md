@@ -98,11 +98,23 @@ page limit is assembled from several pages. Memory also depends on card sizes
 and any batches retained by your own code.
 
 `include_content=False` is the default and yields `CardMetadataRecord` values
-without opening card files. It uses Core's cursor-paged recent-card query,
+without opening card files. By default it uses Core's cursor-paged recent-card query,
 ordered by `updated_at` and then `card_id`, both descending.
 `include_content=True` yields `CompleteCardRecord` values in ascending `card_id`
 order through the existing authoritative-body page operation. Existing
 `.list()`, `.to_records()` and `.to_dataframe()` methods retain their behavior.
+
+`tag="experiment"` selects a case-insensitive tag without a leading `#`.
+`roots=True` selects project roots; `parent_card_id=...` selects immediate live
+children, not descendants. Tag and hierarchy selections combine before Core
+paginates. Roots and a parent ID cannot be combined. Unknown tags or a parent
+with no live children in this project yield no batches. Trashed cards are excluded.
+`order="card_id"` selects ascending IDs; `order="updated"` selects descending
+`updated_at` with descending IDs breaking ties. Omit it to keep the content-dependent
+default above. Filters and explicit ordering require Core's collection-page API;
+an older SDK raises `NotImplementedError` before iteration. Invalid filter types,
+empty tag/parent strings, conflicting hierarchy choices and unsupported ordering
+are rejected at the call; Core validates tag syntax when the first page is read.
 
 There is no snapshot across page calls. Keep the project open during iteration;
 closing it makes unread batches unavailable, while batches already returned

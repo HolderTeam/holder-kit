@@ -54,6 +54,12 @@ def main() -> None:
             assert [len(batch) for batch in complete_batches] == [1, 1]
             assert all("content" not in batch[0] for batch in metadata_batches)
             assert any(batch[0]["content"] == "After" for batch in complete_batches)
+            if holderkit._native.CARD_COLLECTION_SUPPORTED:
+                project.tags.add(first.card_id, "experiment")
+                filtered = list(project.cards(tag="EXPERIMENT", roots=True, batch_size=1, include_content=True))
+                assert len(filtered) == 1 and filtered[0][0]["card_id"] == first.card_id
+                assert "After" in filtered[0][0]["content"]
+                assert list(project.cards(tag="missing")) == []
             context.connections.remove(second.card_id, first.card_id, "depends_on")
             assert context.connections.to_records(project.project_id) == []
     print(f"Installed holder-kit {installed.version} passed with core {info['commit']}")

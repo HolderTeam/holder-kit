@@ -156,3 +156,14 @@ is `HolderTeam/holder-kit`. When updating an older environment, uninstall the
 former `holder` distribution and replace `import holder` with `import holderkit`.
 Dependency declarations use `holder-kit`, `holder-kit[pandas]` or
 `holder-kit[graph]`. There is no compatibility import shim.
+
+## Filtered card batch build requirements
+
+Filtered `project.cards(...)` batches use Core's `holder_card_collection_page_json`
+API, advertised by `HOLDER_HAS_CARD_COLLECTION_PAGE`. The currently pinned SDK
+predates this API. To develop and test it before a supporting SDK is published,
+use the explicit source override above with the Core collection-page branch.
+Existing unfiltered batches continue to work with the pinned SDK; requesting
+filters or explicit ordering on it raises `NotImplementedError`. Move both SDK
+and source pins together after the Core change has a published SDK, and run
+Kit's filtered tests and installed-wheel checks against that exact revision.
