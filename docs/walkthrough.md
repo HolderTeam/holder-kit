@@ -75,11 +75,13 @@ For a larger project, read batches instead of collecting every card at once:
 
 ```python
 for batch in project.cards(batch_size=256, include_content=True):
-    print("Cards in this batch:", len(batch))
+    for card in batch:
+        print(card["title"], card["content"])
 ```
 
 Calling `project.cards(...)` returns a lazy iterator of record lists. The final
-batch may be smaller. Omit `include_content` for metadata-only records.
+batch may be smaller. Keep the project open while iterating; each batch contains
+ordinary Python records. Omit `include_content` for metadata-only records.
 
 ## Analyse the project with pandas
 
