@@ -21,6 +21,7 @@ def main() -> None:
     installed = distribution("holder-kit")
     assert installed.version == args.version, installed.version
     assert _native.Context.__module__ == "holderkit._native"
+    assert _native.PROJECT_IMPORT_SUPPORTED, "Release SDK must support cloning"
     assert importlib.util.find_spec("holder") is None
     assert importlib.util.find_spec("pandas") is None
     assert importlib.util.find_spec("networkx") is None
@@ -47,6 +48,12 @@ def main() -> None:
             assert context.connections.to_records(project.project_id)
             records = context.cards.to_records(project.project_id, include_content=True)
             assert any(card["content"] == "After" for card in records)
+            metadata_batches = list(project.cards(batch_size=1))
+            complete_batches = list(project.cards(batch_size=1, include_content=True))
+            assert [len(batch) for batch in metadata_batches] == [1, 1]
+            assert [len(batch) for batch in complete_batches] == [1, 1]
+            assert all("content" not in batch[0] for batch in metadata_batches)
+            assert any(batch[0]["content"] == "After" for batch in complete_batches)
             context.connections.remove(second.card_id, first.card_id, "depends_on")
             assert context.connections.to_records(project.project_id) == []
     print(f"Installed holder-kit {installed.version} passed with core {info['commit']}")

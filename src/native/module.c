@@ -622,6 +622,33 @@ Context_list_cards(ContextObject *self, PyObject *args, PyObject *kwargs)
 }
 
 static PyObject *
+Context_query_cards(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *project_id = NULL;
+    const char *request_json = NULL;
+    static char *keywords[] = {"project_id", "request_json", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss:query_cards", keywords,
+                                    &project_id, &request_json)) {
+        return NULL;
+    }
+    if (!ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_query_json(
+        self->context, project_id, request_json, &output, &error
+    );
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
 Context_list_complete_cards_page(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *project_id = NULL;
@@ -788,6 +815,8 @@ static PyMethodDef Context_methods[] = {
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Create a card and return its metadata.")},
     {"list_cards", PyCFunction_CAST(Context_list_cards),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("List live cards in a project.")},
+    {"query_cards", PyCFunction_CAST(Context_query_cards),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Query a card metadata view through Core.")},
     {"list_complete_cards_page", PyCFunction_CAST(Context_list_complete_cards_page),
      METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("List one opaque-cursor page of live cards with authoritative bodies.")},
@@ -842,6 +871,9 @@ static int
 holder_module_exec(PyObject *module)
 {
     if (PyModule_AddIntConstant(module, "PROJECT_IMPORT_SUPPORTED", HOLDER_HAS_PROJECT_IMPORT) < 0) {
+        return -1;
+    }
+    if (PyModule_AddIntConstant(module, "CARD_PAGE_MAX_LIMIT", HOLDER_CARD_LIST_COMPLETE_MAX_LIMIT) < 0) {
         return -1;
     }
     holder_module_state *state = PyModule_GetState(module);

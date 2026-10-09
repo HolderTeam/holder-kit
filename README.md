@@ -56,6 +56,16 @@ remove it locally. See [Publishing and finishing a project](docs/publication.md)
 Follow the [walkthrough](docs/walkthrough.md) to create connected cards, add tags
 and milestones, and analyse detached records with pandas and NetworkX.
 
+For larger projects, process cards a batch at a time:
+
+```python
+for batch in project.cards(batch_size=256, include_content=True):
+    for card in batch:
+        print(card["title"], card["content"])
+```
+
+Use this while the project is open. Each batch contains ordinary Python records.
+
 ## Installation
 
 Holder Kit is currently in early development.
