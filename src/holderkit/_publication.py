@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from ._storage import _MARKER, _git, _managed_marker, _remote
+from ._storage import _MARKER, _git, _managed_marker, _remote, _remove_tree
 from .data import DiscardPreview, Project, PushPreview, PushResult
 
 
@@ -164,6 +163,6 @@ def discard(project: Project, *, confirm: bool) -> None:
     removed = path.with_name(".holder-kit-discard-" + str(uuid4()))
     path.rename(removed)
     try:
-        shutil.rmtree(removed)
+        _remove_tree(removed)
     except OSError as error:
         raise RuntimeError(f"Project is closed; incomplete permanent cleanup remains at {removed}") from error

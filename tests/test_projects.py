@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import shutil
 import socket
 import sqlite3
+import stat
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 import pytest
 
@@ -498,13 +500,52 @@ def test_discard_partial_cleanup_reports_remaining_directory(tmp_path: Path, mon
     from holderkit import _publication
 
     project = holderkit.create("Research", workspace=tmp_path / "private")
-    def fail(path: Path) -> None:
+    def fail(path: Path, **kwargs: object) -> None:
         raise PermissionError("Fixture cleanup failure")
     monkeypatch.setattr(shutil, "rmtree", fail)
     with pytest.raises(RuntimeError, match="incomplete permanent cleanup remains"):
         project.discard(confirm=True)
     assert project.closed and not project.path.exists()
     assert len(list(tmp_path.glob(".holder-kit-discard-*"))) == 1
+
+
+def test_discard_removes_readonly_local_files(tmp_path: Path) -> None:
+    project = holderkit.create("Read-only objects", workspace=tmp_path / "private")
+    project.create_card("Result", "Body")
+    readonly = Path(project.root_path) / "local-artifact.txt"
+    readonly.write_text("Local data")
+    readonly.chmod(stat.S_IREAD)
+    project.discard(confirm=True)
+    assert project.closed and not project.path.exists()
+
+
+@pytest.mark.parametrize("kind", ["readonly", "writable", "outside"])
+def test_windows_cleanup_retry_is_limited_to_owned_readonly_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str,
+) -> None:
+    from holderkit._storage import _remove_tree
+
+    owned = tmp_path / "owned"
+    owned.mkdir()
+    file = (tmp_path if kind == "outside" else owned) / "object"
+    file.write_text("Git object")
+    file.chmod(stat.S_IREAD if kind != "writable" else stat.S_IREAD | stat.S_IWRITE)
+    def denied(path: Path, *, onerror: Callable[..., Any]) -> None:
+        try:
+            raise PermissionError("Fixture permission failure")
+        except PermissionError as error:
+            onerror(os.unlink, str(file), (type(error), error, error.__traceback__))
+        path.rmdir()
+    with monkeypatch.context() as patch:
+        patch.setattr(shutil, "rmtree", denied)
+        patch.setattr(sys, "platform", "win32")
+        if kind == "readonly":
+            _remove_tree(owned)
+            assert not owned.exists()
+        else:
+            with pytest.raises(PermissionError, match="Fixture"):
+                _remove_tree(owned)
+            assert file.exists()
 
 
 def test_create_reopen_retains_edits_and_context_lifecycle(tmp_path: Path) -> None:

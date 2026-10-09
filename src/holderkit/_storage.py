@@ -10,7 +10,8 @@ import stat
 import subprocess
 import sys
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
+from types import TracebackType
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -19,6 +20,28 @@ if TYPE_CHECKING:
     from .data import Project
 
 _MARKER = ".holder-kit.json"
+
+
+def _remove_tree(path: Path) -> None:
+    """Remove owned storage, including Git's read-only files on Windows."""
+    def retry_readonly(
+        function: Callable[..., Any], filename: str,
+        error: tuple[type[BaseException], BaseException, TracebackType],
+    ) -> None:
+        file = Path(filename)
+        if (
+            sys.platform != "win32"
+            or not isinstance(error[1], PermissionError)
+            or file.is_symlink()
+            or not file.is_file()
+            or not file.resolve().is_relative_to(path.resolve())
+            or file.stat().st_mode & stat.S_IWRITE
+        ):
+            raise error[1]
+        file.chmod(stat.S_IREAD | stat.S_IWRITE)
+        function(filename)
+
+    shutil.rmtree(path, onerror=retry_readonly)
 
 
 def _default_parent() -> Path:
@@ -224,7 +247,7 @@ def create(name: str, *, workspace: os.PathLike[str] | str | None = None) -> Pro
     except BaseException:
         if context is not None:
             context.close()
-        shutil.rmtree(path)
+        _remove_tree(path)
         raise
 
 
@@ -331,7 +354,7 @@ def clone(
     except BaseException:
         if context is not None:
             context.close()
-        shutil.rmtree(path)
+        _remove_tree(path)
         raise
 
 
