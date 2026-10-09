@@ -165,8 +165,8 @@ class Remote:
     revision: str
 
 
-@pytest.fixture
-def remote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Remote]:
+@pytest.fixture(params=["ssh"] if sys.platform == "win32" else ["daemon", "ssh"])
+def remote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> Iterator[Remote]:
     if not holderkit._native.PROJECT_IMPORT_SUPPORTED:
         pytest.skip(
             "Remote import needs the newer core API; use an explicit development source override"
@@ -196,7 +196,7 @@ def remote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Remote]:
         check=True,
         capture_output=True,
     )
-    if sys.platform == "win32":
+    if request.param == "ssh":
         # Git for Windows' daemon can stall receive-pack and leave workers
         # holding its stderr pipe open. Exercise real Git's SSH transport with
         # a local shim instead; no credentials or external server are needed.
@@ -208,7 +208,7 @@ def remote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Remote]:
             "    sys.exit(1)\n"
             f"base = pathlib.Path({str(tmp_path)!r})\n"
             "repository = base / pathlib.PurePosixPath(command[1]).name\n"
-            "sys.exit(subprocess.call(['git', command[0], str(repository)], "
+            "sys.exit(subprocess.call(['git', command[0].removeprefix('git-'), str(repository)], "
             "stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer))\n",
             encoding="utf-8",
         )
