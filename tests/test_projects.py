@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import shutil
 import socket
 import sqlite3
+import stat
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Callable, Iterator
 
 import pytest
 
@@ -165,12 +167,22 @@ class Remote:
     revision: str
 
 
-@pytest.fixture
-def remote(tmp_path: Path) -> Iterator[Remote]:
+@pytest.fixture(params=["ssh"] if sys.platform == "win32" else ["daemon", "ssh"])
+def remote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> Iterator[Remote]:
     if not holderkit._native.PROJECT_IMPORT_SUPPORTED:
         pytest.skip(
             "Remote import needs the newer core API; use an explicit development source override"
         )
+    # Bound every Git client used by these disposable remotes, including Kit's
+    # subprocess calls. A stalled fixture must fail with the command identified
+    # rather than occupying a runner until the entire workflow times out.
+    original_run = subprocess.run
+
+    def bounded_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
+        kwargs.setdefault("timeout", 30)
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", bounded_run)
     with holderkit.open(tmp_path / "source") as context:
         project = context.create_project("Remote research")
         first = context.create_card(
@@ -186,6 +198,32 @@ def remote(tmp_path: Path) -> Iterator[Remote]:
         check=True,
         capture_output=True,
     )
+    if request.param == "ssh":
+        # Git for Windows' daemon can stall receive-pack and leave workers
+        # holding its stderr pipe open. Exercise real Git's SSH transport with
+        # a local shim instead; no credentials or external server are needed.
+        shim = tmp_path / "fixture-ssh.py"
+        shim.write_text(
+            "import pathlib, shlex, subprocess, sys\n"
+            "command = shlex.split(sys.argv[-1])\n"
+            "if len(command) != 2 or command[0] not in ('git-upload-pack', 'git-receive-pack'):\n"
+            "    sys.exit(1)\n"
+            f"base = pathlib.Path({str(tmp_path)!r})\n"
+            "repository = base / pathlib.PurePosixPath(command[1]).name\n"
+            "sys.exit(subprocess.call(['git', command[0].removeprefix('git-'), str(repository)], "
+            "stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer))\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv(
+            "GIT_SSH_COMMAND",
+            f"{shlex.quote(Path(sys.executable).as_posix())} {shlex.quote(shim.as_posix())}",
+        )
+        yield Remote(
+            "ssh://fixture@localhost/research.git", source, bare,
+            project.project_id, first.card_id, second.card_id,
+            git(source, "rev-parse", "HEAD"),
+        )
+        return
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
@@ -462,13 +500,52 @@ def test_discard_partial_cleanup_reports_remaining_directory(tmp_path: Path, mon
     from holderkit import _publication
 
     project = holderkit.create("Research", workspace=tmp_path / "private")
-    def fail(path: Path) -> None:
+    def fail(path: Path, **kwargs: object) -> None:
         raise PermissionError("Fixture cleanup failure")
     monkeypatch.setattr(shutil, "rmtree", fail)
     with pytest.raises(RuntimeError, match="incomplete permanent cleanup remains"):
         project.discard(confirm=True)
     assert project.closed and not project.path.exists()
     assert len(list(tmp_path.glob(".holder-kit-discard-*"))) == 1
+
+
+def test_discard_removes_readonly_local_files(tmp_path: Path) -> None:
+    project = holderkit.create("Read-only objects", workspace=tmp_path / "private")
+    project.create_card("Result", "Body")
+    readonly = Path(project.root_path) / "local-artifact.txt"
+    readonly.write_text("Local data")
+    readonly.chmod(stat.S_IREAD)
+    project.discard(confirm=True)
+    assert project.closed and not project.path.exists()
+
+
+@pytest.mark.parametrize("kind", ["readonly", "writable", "outside"])
+def test_windows_cleanup_retry_is_limited_to_owned_readonly_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str,
+) -> None:
+    from holderkit._storage import _remove_tree
+
+    owned = tmp_path / "owned"
+    owned.mkdir()
+    file = (tmp_path if kind == "outside" else owned) / "object"
+    file.write_text("Git object")
+    file.chmod(stat.S_IREAD if kind != "writable" else stat.S_IREAD | stat.S_IWRITE)
+    def denied(path: Path, *, onerror: Callable[..., Any]) -> None:
+        try:
+            raise PermissionError("Fixture permission failure")
+        except PermissionError as error:
+            onerror(os.unlink, str(file), (type(error), error, error.__traceback__))
+        path.rmdir()
+    with monkeypatch.context() as patch:
+        patch.setattr(shutil, "rmtree", denied)
+        patch.setattr(sys, "platform", "win32")
+        if kind == "readonly":
+            _remove_tree(owned)
+            assert not owned.exists()
+        else:
+            with pytest.raises(PermissionError, match="Fixture"):
+                _remove_tree(owned)
+            assert file.exists()
 
 
 def test_create_reopen_retains_edits_and_context_lifecycle(tmp_path: Path) -> None:

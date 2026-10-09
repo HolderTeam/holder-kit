@@ -140,8 +140,9 @@ jobs:
           env -u HOLDER_CORE_SDK -u CMAKE_ARGS -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH \
             "$test_python" -I scripts/test-installed-wheel.py --core-commit "$CORE_COMMIT" --version "$KIT_VERSION"
           "$test_python" -m pip install 'pytest>=8' pandas networkx
-          "$test_python" -I -m pytest -q --import-mode=importlib tests/test_holder.py \
-            tests/test_connections.py tests/test_graph.py tests/test_pandas.py
+          "$test_python" -I -m pytest -v -x -o faulthandler_timeout=60 --import-mode=importlib tests/test_holder.py \
+            tests/test_connections.py tests/test_graph.py tests/test_pandas.py \
+            tests/test_projects.py tests/test_card_batches.py
       - name: Linux wheel in a clean Debian runtime
         if: runner.os == 'Linux'
         env:

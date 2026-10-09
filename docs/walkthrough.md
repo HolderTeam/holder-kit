@@ -71,6 +71,18 @@ Records contain standard-library values and remain usable after the project
 closes. Card exports omit bodies by default; `include_content=True` adds the
 `content` field. Changing an exported dictionary does not update Holder.
 
+For a larger project, read batches instead of collecting every card at once:
+
+```python
+for batch in project.cards(batch_size=256, include_content=True):
+    for card in batch:
+        print(card["title"], card["content"])
+```
+
+Calling `project.cards(...)` returns a lazy iterator of record lists. The final
+batch may be smaller. Keep the project open while iterating; each batch contains
+ordinary Python records. Omit `include_content` for metadata-only records.
+
 ## Analyse the project with pandas
 
 ```python

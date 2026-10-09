@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import builtins
-from typing import TYPE_CHECKING, Literal, overload
+import json
+from typing import TYPE_CHECKING, Any, Iterator, Literal, Mapping, overload
 
 from .collections import (
     CardCollection,
@@ -26,6 +27,8 @@ from .data import (
     TagRecord,
     TagRemoveResult,
 )
+from .data.card import _complete_record_from_native, _metadata_record_from_native
+from . import _native
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -40,6 +43,82 @@ class _ProjectCollection:
 
 class ProjectCards(_ProjectCollection):
     """Cards belonging to this project; exported values are detached."""
+
+    @overload
+    def __call__(
+        self, *, batch_size: int = 256, include_content: Literal[False] = False,
+    ) -> Iterator[builtins.list[CardMetadataRecord]]: ...
+
+    @overload
+    def __call__(
+        self, *, batch_size: int = 256, include_content: Literal[True],
+    ) -> Iterator[builtins.list[CompleteCardRecord]]: ...
+
+    @overload
+    def __call__(
+        self, *, batch_size: int = 256, include_content: bool,
+    ) -> Iterator[builtins.list[CardMetadataRecord] | builtins.list[CompleteCardRecord]]: ...
+
+    def __call__(
+        self, *, batch_size: int = 256, include_content: bool = False,
+    ) -> Iterator[builtins.list[CardMetadataRecord] | builtins.list[CompleteCardRecord]]:
+        """Lazily yield detached record batches; the last may be smaller.
+
+        Metadata reads omit bodies and follow Core's recency order. Complete
+        reads follow card ID order. There is no snapshot across page reads.
+        """
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int):
+            raise TypeError("batch_size must be a positive integer")
+        if batch_size <= 0:
+            raise ValueError("batch_size must be a positive integer")
+        if not isinstance(include_content, bool):
+            raise TypeError("include_content must be a bool")
+        self._project._live_context()
+        return self._batches(batch_size, include_content)
+
+    def _pages(
+        self, batch_size: int, include_content: bool,
+    ) -> Iterator[builtins.list[Mapping[str, Any]]]:
+        limit = min(batch_size, _native.CARD_PAGE_MAX_LIMIT)
+        cursor: str | None = None
+        request: dict[str, Any] = {"view": "recent", "limit": limit}
+        while True:
+            context = self._project._live_context()
+            if include_content:
+                page = context.list_complete_cards_page(self._project.project_id, cursor, limit)
+                cursor = page["next_cursor"]
+                finished = cursor is None
+            else:
+                page = context.query_cards(self._project.project_id, json.dumps(request))
+                finished = len(page["cards"]) < limit
+                if page["cards"]:
+                    last = page["cards"][-1]
+                    request["before_updated_at"] = last["updated_at"]
+                    request["before_card_id"] = last["card_id"]
+            if page["cards"]:
+                yield page["cards"]
+            if finished:
+                return
+
+    def _batches(
+        self, batch_size: int, include_content: bool,
+    ) -> Iterator[builtins.list[CardMetadataRecord] | builtins.list[CompleteCardRecord]]:
+        pending: builtins.list[Mapping[str, Any]] = []
+        for page in self._pages(batch_size, include_content):
+            pending.extend(page)
+            while len(pending) >= batch_size:
+                records, pending = pending[:batch_size], pending[batch_size:]
+                self._project._live_context()
+                if include_content:
+                    yield [_complete_record_from_native(record) for record in records]
+                else:
+                    yield [_metadata_record_from_native(record) for record in records]
+        if pending:
+            self._project._live_context()
+            if include_content:
+                yield [_complete_record_from_native(record) for record in pending]
+            else:
+                yield [_metadata_record_from_native(record) for record in pending]
 
     def list(self) -> builtins.list[Card]:
         return CardCollection(self._project._live_context()).list(

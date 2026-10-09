@@ -82,6 +82,35 @@ an empty substitute body.
 All returned dictionaries are detached snapshots: they hold copied Python
 values and remain usable after their originating context closes.
 
+## Card batches
+
+```python
+for batch in project.cards(batch_size=256, include_content=True):
+    analyse(batch)
+```
+
+Calling the cards collection returns a lazy iterator of lists. `batch_size`
+must be a positive integer; it defaults to 256. Full batches contain that many
+records, the last may be smaller, and an empty project yields no batches.
+Iteration reads only the pages needed for the next batch and retains a bounded
+number of records rather than the whole project. A batch larger than Core's
+page limit is assembled from several pages. Memory also depends on card sizes
+and any batches retained by your own code.
+
+`include_content=False` is the default and yields `CardMetadataRecord` values
+without opening card files. It uses Core's cursor-paged recent-card query,
+ordered by `updated_at` and then `card_id`, both descending.
+`include_content=True` yields `CompleteCardRecord` values in ascending `card_id`
+order through the existing authoritative-body page operation. Existing
+`.list()`, `.to_records()` and `.to_dataframe()` methods retain their behavior.
+
+There is no snapshot across page calls. Keep the project open during iteration;
+closing it makes unread batches unavailable, while batches already returned
+remain usable. Changes between pages can affect which records are returned,
+particularly when recency values change during metadata iteration. Read,
+decryption or parse errors propagate; complete pages do not substitute missing
+bodies or yield partial results from a failed page.
+
 ## pandas conversion
 
 `projects.to_dataframe()` and `cards.to_dataframe()` use these record-field

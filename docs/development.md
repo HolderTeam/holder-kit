@@ -95,17 +95,23 @@ dependencies, ownership checks and failure behavior where relevant.
 
 ## Clone build requirements
 
-Clone uses Core's `holder_project_import` API. Build against a Core checkout
-that provides it using an explicit source override:
+Clone uses Core's `holder_project_import` API. The release SDK and development
+source pins select `57a025f15b905bc1ec0ffeb7b433980d01634d36`, which provides it.
+To select and build that published SDK:
+
+```sh
+./make.sh sdk 57a025f15b905bc1ec0ffeb7b433980d01634d36
+./make.sh --sdk setup
+```
+
+For Core development, use an explicit source override:
 
 ```sh
 HOLDER_KIT_CORE_SOURCE=/path/to/holder-core ./make.sh setup
 ```
 
-Existing SDK builds support create/reopen, but clone raises `NotImplementedError`
-when the selected SDK lacks project import support. Release pins have not been
-advanced; select and test an SDK containing the API through the normal dependency
-tooling before releasing clone support.
+Selecting an older SDK without project import support still makes clone raise
+`NotImplementedError` before creating storage or contacting the remote.
 
 ## Native sanitizers
 
