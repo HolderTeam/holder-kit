@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping, TypedDict, overload
 
 if TYPE_CHECKING:
     from .project import Project
+    from ..card_collections import CardTags, CardConnections, CardMilestones
 
 
 class CardMetadataRecord(TypedDict):
@@ -191,6 +192,24 @@ class Card:
     def deleted_datetime(self) -> datetime | None:
         deleted_at = self.deleted_at
         return None if deleted_at is None else datetime.fromtimestamp(deleted_at, tz=timezone.utc)
+
+    @property
+    def tags(self) -> CardTags:
+        from ..card_collections import CardTags
+
+        return CardTags(self)
+
+    @property
+    def connections(self) -> CardConnections:
+        from ..card_collections import CardConnections
+
+        return CardConnections(self)
+
+    @property
+    def milestones(self) -> CardMilestones:
+        from ..card_collections import CardMilestones
+
+        return CardMilestones(self)
 
     def update(self, content: str, title: str | None = None) -> Card:
         """Save content and an optional title, returning a live Card."""

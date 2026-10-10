@@ -65,6 +65,19 @@ def main() -> None:
             saved = lifecycle.to_record()
             lifecycle.update("Changed body")
             assert lifecycle.content == "Changed body" and saved["content"] == "Retained body"
+            assert first.tags.add("scoped") == holderkit.TagAddResult.ADDED
+            assert "scoped" in first.tags.list()
+            assert all(record["card_id"] == first.card_id for record in first.tags.to_records())
+            first.tags.remove("scoped")
+            lifecycle.connections.add(first, kind="references")
+            assert lifecycle.connections.to_records()[0]["to_card_id"] == first.card_id
+            lifecycle.connections.remove(first, kind="references")
+            assert lifecycle.connections.to_records() == []
+            milestone = lifecycle.milestones.add(100)[0]
+            lifecycle.milestones.update(milestone["milestone_id"], {"description": "Review"})
+            assert lifecycle.milestones.list()[0]["description"] == "Review"
+            lifecycle.milestones.remove(milestone["milestone_id"])
+            assert lifecycle.milestones.to_records() == []
             lifecycle.delete()
             assert lifecycle.deleted_at is not None
             trashed = project.cards.trashed()

@@ -137,6 +137,43 @@ old handle raise `KeyError`. After the owning Project closes, reads and edits
 raise `RuntimeError`. Stable `card_id`, `project_id` and `card.project` remain
 available in both cases; repr, equality and hashing do not read saved state.
 
+## Card collections
+
+A live Card exposes `card.tags`, `card.connections` and `card.milestones`.
+These adapters use the existing Project/Core operations, with the source ID
+supplied by the Card. A retained adapter reads current state on every call:
+close raises `RuntimeError`, permanent removal raises `KeyError`, and a source
+in Trash raises `ValueError`. Restoring the Card makes its retained adapters
+usable again. There is no cached membership data or automatic reopening.
+
+- `card.tags.list()` and `.list_editable()` return tag names. `.add(tag)` and
+  `.remove(tag)` retain `TagAddResult` and `TagRemoveResult`, including the
+  distinction between trailing tags and occurrences in prose. `.to_records()`
+  returns only that card's `TagRecord` values; `.to_dataframe()` uses the tag
+  schema and dtypes. Core's editable-tag read still reads the authoritative
+  body and retains its existing missing-file policy.
+- `card.connections.add(target_card, kind, label=None)` and
+  `.remove(target_card, kind)` accept a Card, not an ID. Both owners must be
+  open, target identity must exist, and the Cards must share a Context. Targets
+  may be in another project within that Context. Adding requires a live target;
+  removal also accepts a target in Trash. `.to_records()` and `.to_dataframe()`
+  export only this source's explicit outgoing `ConnectionRecord` values,
+  including external or unresolved targets already stored by Core. They do not
+  add backlinks, hierarchy connections or inline wikilinks.
+- `card.milestones.list()` and `.to_records()` return `MilestoneRecord` values
+  for that card. `.add(start_at, end_at=None, all_day=False, kind=None,
+  description=None)` retains the Project operation's keyword-only options and
+  returns the updated full list. `.update(milestone_id, changes)` returns one
+  record and uses the existing tri-state `MilestoneUpdate` validation and
+  ownership checks. `.remove(milestone_id)` retains Core's no-op behaviour for
+  absent or foreign IDs. `.to_dataframe()` uses the milestone schema without
+  the project/title columns of a project-wide export.
+
+These single-card exports use existing scoped reads and do not scan all project
+cards. Results are detached and remain usable after close; changing them does
+not save edits. Core owns validation and durable edits, with the same failures
+and consistency limits as the Project and Context collections below.
+
 ## Card batches
 
 ```python
