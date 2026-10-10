@@ -352,6 +352,32 @@ Context_resolve_card(ContextObject *self, PyObject *args, PyObject *kwargs)
 }
 
 static PyObject *
+Context_move_card(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *project_id = NULL;
+    const char *card_id = NULL;
+    const char *request_json = NULL;
+    static char *keywords[] = {"project_id", "card_id", "request_json", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sss:move_card", keywords,
+                                    &project_id, &card_id, &request_json) ||
+        !ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_move_json(
+        self->context, project_id, card_id, request_json, &output, &error
+    );
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
 Context_list_trashed_cards(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
     return context_json_read(self, args, kwargs, "project_id", holder_card_list_trashed);
@@ -924,6 +950,8 @@ static PyMethodDef Context_methods[] = {
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("List live cards in a project.")},
     {"resolve_card", PyCFunction_CAST(Context_resolve_card),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Resolve a live or trashed card through Core.")},
+    {"move_card", PyCFunction_CAST(Context_move_card),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Move a card using Core's placement rules.")},
     {"list_trashed_cards", PyCFunction_CAST(Context_list_trashed_cards),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("List trashed card metadata in a project.")},
     {"trash_card", PyCFunction_CAST(Context_trash_card),

@@ -78,6 +78,13 @@ def main() -> None:
             assert lifecycle.milestones.list()[0]["description"] == "Review"
             lifecycle.milestones.remove(milestone["milestone_id"])
             assert lifecycle.milestones.to_records() == []
+            assert lifecycle.move(into=first) is lifecycle
+            assert lifecycle.parent == first
+            assert lifecycle.parent.project is project
+            lifecycle.move(before=second)
+            assert lifecycle.parent is None and lifecycle.sort_key < second.sort_key
+            lifecycle.move(after=second)
+            assert lifecycle.sort_key > second.sort_key
             lifecycle.delete()
             assert lifecycle.deleted_at is not None
             trashed = project.cards.trashed()

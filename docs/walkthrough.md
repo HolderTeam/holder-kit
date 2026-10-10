@@ -33,6 +33,26 @@ The following sections use `project` to work with this project. To analyse an
 existing project instead, start with `project = holderkit.clone(remote_url)` and use
 the same analysis methods.
 
+## Arrange cards
+
+```python
+evidence.move(into=report)
+parent = evidence.parent
+if parent is not None:
+    print(parent.title)
+
+evidence.move(before=report)
+assert evidence.parent is None
+
+evidence.move(after=report)
+```
+
+`into` makes a card a child of the target. `before` and `after` place it beside
+the target, sharing its parent. Supply exactly one target Card from the same
+project. These calls save immediately and return the moved Card. The live
+`parent` property returns a Card owned by the same Project, or `None` at the
+root. Core rejects moves that would create a cycle.
+
 ## Add a connection, a tag and a milestone
 
 ```python

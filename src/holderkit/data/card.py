@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from typing import TYPE_CHECKING, Any, Literal, Mapping, TypedDict, overload
 
 if TYPE_CHECKING:
@@ -165,6 +166,15 @@ class Card:
         return _optional_string(self._current()["parent_card_id"])
 
     @property
+    def parent(self) -> Card | None:
+        """The current parent with this same Project owner, or None at the root."""
+        parent_id = self.parent_card_id
+        if parent_id is None:
+            return None
+        self.project._card_record(parent_id)
+        return Card(self.project, parent_id)
+
+    @property
     def sort_key(self) -> float:
         return float(self._current()["sort_key"])
 
@@ -214,6 +224,30 @@ class Card:
     def update(self, content: str, title: str | None = None) -> Card:
         """Save content and an optional title, returning a live Card."""
         return self.project.update_card(self.card_id, content, title)
+
+    def move(
+        self, *, into: Card | None = None, before: Card | None = None,
+        after: Card | None = None,
+    ) -> Card:
+        """Move into a parent or beside a sibling, returning this live Card.
+
+        Supply exactly one Card in the same project and Context. Moving beside
+        a root card places this card at the root. Both cards must be live.
+        Core determines ordering and rejects moves that would create cycles.
+        """
+        placements = [(intent, target) for intent, target in
+                      (("into", into), ("before", before), ("after", after))
+                      if target is not None]
+        if len(placements) != 1:
+            raise ValueError("Supply exactly one of into, before or after")
+        intent, target = placements[0]
+        self.project._require_owned_card(self)
+        self.project._require_card(self.card_id)
+        self.project._require_owned_card(target)
+        self.project._require_card(target.card_id)
+        request = json.dumps({"intent": intent, "target_card_id": target.card_id})
+        self.project._live_context().move_card(self.project_id, self.card_id, request)
+        return self
 
     def delete(self, *, hard: bool = False) -> None:
         """Move to Trash, or permanently remove an already-trashed card with hard=True."""
