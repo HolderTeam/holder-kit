@@ -82,6 +82,23 @@ an empty substitute body.
 All returned dictionaries are detached snapshots: they hold copied Python
 values and remain usable after their originating context closes.
 
+## Card hierarchy
+
+`card.parent` reads the current parent and returns a live Card with the same
+Project owner, or `None` for a root card. `parent_card_id` remains available for
+record-oriented code. Parent reads require an open owner and an existing card.
+
+`card.move(into=parent)`, `card.move(before=sibling)` and
+`card.move(after=sibling)` save immediately and return the same Card instance.
+Supply exactly one non-None Card target. Both cards must be live, belong to the
+same project and share a native Context; a target's own Project must also be
+open. Moving beside a root card makes the moved card a root. Core owns placement,
+sibling ordering and cycle validation; its rejected moves raise `HolderError`.
+Invalid target types raise `TypeError`; conflicting or missing options, foreign
+owners and trashed cards raise `ValueError`. Purged handles raise `KeyError`,
+including when another card's title matches the removed ID. Closed owners raise
+`RuntimeError`. Exported records remain detached after moves.
+
 ## Live Cards and lifecycle
 
 `project.create_card(...)` and `project.cards.list()` return live Card handles.
