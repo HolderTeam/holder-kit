@@ -83,6 +83,11 @@ Project through `card.project`. Use `Project.to_record()` and `Card.to_record()`
 for detached values. Card identity is stable; reads and edits require an open owner. Managed Projects own
 their context; Projects obtained from a Context borrow it and close independently.
 
+Card-scoped tags, connections and milestones are adapters over the existing
+Project and collection operations. Keep ownership/lifetime checks on live handles,
+and reuse Core semantics and detached record schemas. Single-card exports must
+not scan an entire project to select their source.
+
 Records, DataFrames and graphs are detached data. They remain usable after the
 context closes, and editing them does not write back to Holder. Card exports
 omit bodies by default. Exporting related tables makes separate core reads and

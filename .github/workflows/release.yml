@@ -142,7 +142,7 @@ jobs:
           "$test_python" -m pip install 'pytest>=8' pandas networkx
           "$test_python" -I -m pytest -v -x -o faulthandler_timeout=60 --import-mode=importlib tests/test_holder.py \
             tests/test_connections.py tests/test_graph.py tests/test_pandas.py \
-            tests/test_projects.py tests/test_card_batches.py tests/test_live_cards.py
+            tests/test_projects.py tests/test_card_batches.py tests/test_live_cards.py tests/test_card_collections.py
       - name: Linux wheel in a clean Debian runtime
         if: runner.os == 'Linux'
         env:

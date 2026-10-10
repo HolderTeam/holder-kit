@@ -40,17 +40,31 @@ from datetime import datetime, timezone
 
 review_at = int(datetime(2026, 10, 12, 9, tzinfo=timezone.utc).timestamp())
 
-project.connections.add(
-    report.card_id, evidence.card_id, "depends_on", "Needs evidence"
-)
-project.tags.add(evidence.card_id, "todo")
-project.milestones.add(evidence.card_id, review_at)
+report.connections.add(evidence, kind="depends_on", label="Needs evidence")
+evidence.tags.add("todo")
+evidence.milestones.add(review_at)
 ```
 
 The explicit connection points from the report to its evidence. Connections
 can have custom kinds and optional labels. Tags use core's semantic tag
 operations. Milestones use integer Unix seconds; this one marks a review at
 09:00 UTC on 12 October 2026.
+
+Use `evidence.tags.list()`, `report.connections.to_records()` or
+`evidence.milestones.list()` to read that card's current values. Each collection
+also provides detached records and optional pandas DataFrames. To update a
+milestone, pass its ID and the fields you want to change:
+
+```python
+milestone = evidence.milestones.list()[0]
+evidence.milestones.update(milestone["milestone_id"], {"description": "Review evidence"})
+```
+
+Project collections remain available for project-wide queries and exports.
+Connection targets are Cards in the same Context, including other projects;
+use a live target when adding. Removing a connection can also target a Card
+in Trash. All collection operations require the source Card to be live and its
+Project open.
 
 These calls write to Holder immediately. See the
 [record contracts](record-contracts.md) for tag result enums, milestone updates
