@@ -60,6 +60,26 @@ def main() -> None:
             assert len(filtered) == 1 and filtered[0][0]["card_id"] == first.card_id
             assert "After" in filtered[0][0]["content"]
             assert list(project.cards(tag="missing")) == []
+            lifecycle = project.create_card("Lifecycle", "Retained body")
+            assert lifecycle.project is project
+            saved = lifecycle.to_record()
+            lifecycle.update("Changed body")
+            assert lifecycle.content == "Changed body" and saved["content"] == "Retained body"
+            lifecycle.delete()
+            assert lifecycle.deleted_at is not None
+            trashed = project.cards.trashed()
+            assert len(trashed) == 1 and trashed[0].project is project
+            lifecycle = trashed[0].restore()
+            assert lifecycle.content == "Changed body"
+            lifecycle.trash()
+            lifecycle.delete(hard=True)
+            assert project.cards.trashed() == []
+            try:
+                lifecycle.to_record()
+            except KeyError:
+                pass
+            else:
+                raise AssertionError("Purged Card returned saved data")
             context.connections.remove(second.card_id, first.card_id, "depends_on")
             assert context.connections.to_records(project.project_id) == []
     print(f"Installed holder-kit {installed.version} passed with core {info['commit']}")

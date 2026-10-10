@@ -1,33 +1,30 @@
-"""Create, retrieve, and update a card using embedded libholder."""
+"""Work with a live Card, then trash, restore and permanently remove it."""
 
 from __future__ import annotations
 
 import json
-import tempfile
-from pathlib import Path
 
-from holderkit import Context
+import holderkit
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="holder-kit-example-") as temporary:
-        data_dir = Path(temporary) / "data"
-        with Context(data_dir) as context:
-            project = context.create_project("Python example")
-            card = context.create_card(
-                project.project_id, "Hello from Python", "Initial body"
-            )
-            print("Created:", json.dumps(card.to_record(), indent=2))
-            print("Retrieved body:", context.get_card_content(card.card_id))
+    with holderkit.create("Python card example") as project:
+        card = project.create_card("Hello from Python", "Initial body")
+        assert card.project is project
+        saved = card.to_record()
+        card.update("Updated findings", title="Updated from Python")
+        print("Current:", json.dumps(card.to_record(), indent=2))
+        print("Earlier:", json.dumps(saved, indent=2))
 
-            updated = context.update_card(
-                card.card_id, "Updated through libholder", "Updated from Python"
-            )
-            print("Updated:", json.dumps(updated.to_record(), indent=2))
-            print(
-                "Records:",
-                json.dumps(context.cards.to_records(project.project_id), indent=2),
-            )
+        card.trash()  # card.delete() is equivalent
+        print("Trash:", [item.title for item in project.cards.trashed()])
+        card = card.restore()
+        print("Restored:", card.content)
+
+        card.delete()
+        card.purge()  # card.delete(hard=True) is equivalent
+        print("Remaining cards:", len(project.cards.list()))
+    # Closing retains the project and its history.
 
 
 if __name__ == "__main__":

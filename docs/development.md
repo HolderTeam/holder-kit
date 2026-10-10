@@ -78,8 +78,9 @@ use temporary contexts and bare repositories, never a live Holder project.
 `Context` owns the native `holder_context`; close it explicitly or use a context
 manager. Native runtime failures raise `holderkit.HolderError`, and invalid core
 arguments raise `ValueError`. `Project` is a live interface to one project;
-its properties read current state. `Card` remains a frozen, slotted snapshot.
-Use `Project.to_record()` for detached project values. Managed Projects own
+its properties read current state. `Card` is also live and keeps its owning
+Project through `card.project`. Use `Project.to_record()` and `Card.to_record()`
+for detached values. Card identity is stable; reads and edits require an open owner. Managed Projects own
 their context; Projects obtained from a Context borrow it and close independently.
 
 Records, DataFrames and graphs are detached data. They remain usable after the

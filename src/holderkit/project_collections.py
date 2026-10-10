@@ -42,7 +42,7 @@ class _ProjectCollection:
 
 
 class ProjectCards(_ProjectCollection):
-    """Cards belonging to this project; exported values are detached."""
+    """Live Card handles or detached record exports belonging to this project."""
 
     @overload
     def __call__(
@@ -162,9 +162,13 @@ class ProjectCards(_ProjectCollection):
                 yield [_metadata_record_from_native(record) for record in pending]
 
     def list(self) -> builtins.list[Card]:
-        return CardCollection(self._project._live_context()).list(
-            self._project.project_id
-        )
+        return [Card._from_native(record, self._project) for record in
+                self._project._live_context().list_cards(self._project.project_id)]
+
+    def trashed(self) -> builtins.list[Card]:
+        """Find live Card handles for the project's Trash, including after reopening."""
+        return [Card._from_native(record, self._project) for record in
+                self._project._live_context().list_trashed_cards(self._project.project_id)]
 
     @overload
     def to_records(
