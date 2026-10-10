@@ -237,12 +237,60 @@ class Project:
 
         return ProjectMilestones(self)
 
+    def _card_record(self, card_id: str) -> Mapping[str, Any]:
+        result = self._live_context().resolve_card(self.project_id, card_id)
+        record = result.get("card")
+        # Core also resolves prefixes/titles; a handle must resolve only its exact identity.
+        if (result.get("status") != "resolved" or not isinstance(record, dict) or
+                record.get("card_id") != card_id or record.get("project_id") != self.project_id):
+            raise KeyError(f"Card not found in this project: {card_id}")
+        return record
+
     def _require_card(self, card_id: str) -> None:
-        if not any(
-            card["card_id"] == card_id
-            for card in self._live_context().list_cards(self.project_id)
-        ):
+        try:
+            record = self._card_record(card_id)
+        except KeyError:
+            raise ValueError("Card does not belong to this project") from None
+        if record["deleted_at"] is not None:
+            raise ValueError("Card does not belong to this project's live cards")
+
+    def _require_owned_card(self, card: Card) -> None:
+        from .card import Card
+
+        self._live_context()
+        if not isinstance(card, Card):
+            raise TypeError("Expected a Card")
+        if card.project_id != self.project_id or card.project._context is not self._context:
             raise ValueError("Card does not belong to this project")
+        card.project._live_context()
+        self._card_record(card.card_id)
+
+    def delete(self, card: Card, *, hard: bool = False) -> None:
+        """Move a Card to Trash; hard=True permanently removes an already-trashed Card."""
+        if not isinstance(hard, bool):
+            raise TypeError("hard must be a bool")
+        self._require_owned_card(card)
+        context = self._live_context()
+        if hard:
+            context.purge_card(card.card_id)
+        else:
+            context.trash_card(card.card_id)
+
+    def trash(self, card: Card) -> None:
+        """Move a Card to Trash; equivalent to delete(card)."""
+        self.delete(card)
+
+    def purge(self, card: Card) -> None:
+        """Permanently remove an already-trashed Card; equivalent to delete(card, hard=True)."""
+        self.delete(card, hard=True)
+
+    def restore(self, card: Card) -> Card:
+        """Restore one trashed Card; promoted children remain in their current positions."""
+        from .card import Card
+
+        self._require_owned_card(card)
+        record = self._live_context().restore_card(card.card_id)
+        return Card._from_native(record, self)
 
     def create_card(
         self,
@@ -257,7 +305,7 @@ class Project:
         record = self._live_context().create_card(
             self.project_id, title, content, parent_card_id
         )
-        return Card._from_native(record, content)
+        return Card._from_native(record, self)
 
     def list_cards(self) -> list[Card]:
         return self.cards.list()
@@ -271,7 +319,7 @@ class Project:
 
         self._require_card(card_id)
         record = self._live_context().update_card(card_id, content, title)
-        return Card._from_native(record, content)
+        return Card._from_native(record, self)
 
     def to_dataframes(self, *, include_content: bool = False) -> DataFrames:
         from .. import Context

@@ -328,6 +328,76 @@ context_json_read(ContextObject *self, PyObject *args, PyObject *kwargs,
 }
 
 static PyObject *
+Context_resolve_card(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *project_id = NULL;
+    const char *card_id = NULL;
+    static char *keywords[] = {"project_id", "card_id", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss:resolve_card", keywords,
+                                    &project_id, &card_id) || !ensure_context_open(self)) {
+        return NULL;
+    }
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_reference_resolve(
+        self->context, project_id, card_id, 2, &output, &error
+    );
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+}
+
+static PyObject *
+Context_list_trashed_cards(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return context_json_read(self, args, kwargs, "project_id", holder_card_list_trashed);
+}
+
+static PyObject *
+Context_restore_card(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return context_json_read(self, args, kwargs, "card_id", holder_card_restore);
+}
+
+typedef int (*context_card_mutation)(holder_context *, const char *, holder_error **);
+
+static PyObject *
+context_mutate_card(ContextObject *self, PyObject *args, PyObject *kwargs,
+                    context_card_mutation operation)
+{
+    const char *card_id = NULL;
+    static char *keywords[] = {"card_id", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", keywords, &card_id) ||
+        !ensure_context_open(self)) {
+        return NULL;
+    }
+    holder_error *error = NULL;
+    const int result = operation(self->context, card_id, &error);
+    if (result != HOLDER_OK) {
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+Context_trash_card(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return context_mutate_card(self, args, kwargs, holder_card_delete);
+}
+
+static PyObject *
+Context_purge_card(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    return context_mutate_card(self, args, kwargs, holder_card_purge);
+}
+
+static PyObject *
 Context_list_tags(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
     return context_json_read(self, args, kwargs, "card_id", holder_card_list_tags);
@@ -852,6 +922,16 @@ static PyMethodDef Context_methods[] = {
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Create a card and return its metadata.")},
     {"list_cards", PyCFunction_CAST(Context_list_cards),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("List live cards in a project.")},
+    {"resolve_card", PyCFunction_CAST(Context_resolve_card),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Resolve a live or trashed card through Core.")},
+    {"list_trashed_cards", PyCFunction_CAST(Context_list_trashed_cards),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("List trashed card metadata in a project.")},
+    {"trash_card", PyCFunction_CAST(Context_trash_card),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Move a card to Trash and promote its live children.")},
+    {"restore_card", PyCFunction_CAST(Context_restore_card),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Restore one trashed card through Core.")},
+    {"purge_card", PyCFunction_CAST(Context_purge_card),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Permanently remove a card that is already in Trash.")},
     {"query_cards", PyCFunction_CAST(Context_query_cards),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Query a card metadata view through Core.")},
     {"collection_cards_page", PyCFunction_CAST(Context_collection_cards_page),

@@ -72,11 +72,12 @@ def test_unresolved_card_and_non_card_targets_in_detached_records(tmp_path: Path
     with holderkit.open(tmp_path / "data") as context:
         project = context.create_project("Detached adapters")
         source = context.create_card(project.project_id, "Source")
+        source_created_at = source.created_at
         cards = context.cards.to_records()
     unresolved: holderkit.ConnectionRecord = {
         "project_id": project.project_id, "from_card_id": source.card_id,
         "to_card_id": "unknown-card", "to_type": "card", "kind": "references",
-        "label": None, "created_at": source.created_at, "to_title": None,
+        "label": None, "created_at": source_created_at, "to_title": None,
     }
     resource: holderkit.ConnectionRecord = {
         **unresolved, "to_card_id": "resource-id", "to_type": "resource",

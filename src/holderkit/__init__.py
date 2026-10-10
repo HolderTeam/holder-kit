@@ -146,7 +146,7 @@ class Context:
         metadata = self._context.create_card(
             project_id, title, content, parent_card_id
         )
-        return Card._from_native(metadata, content)
+        return Card._from_native(metadata, Project(self._context, str(metadata["project_id"])))
 
     def list_cards(self, project_id: str) -> list[Card]:
         return self.cards.list(project_id)
@@ -158,7 +158,7 @@ class Context:
         self, card_id: str, content: str, title: str | None = None
     ) -> Card:
         metadata = self._context.update_card(card_id, content, title)
-        return Card._from_native(metadata, content)
+        return Card._from_native(metadata, Project(self._context, str(metadata["project_id"])))
 
     def __enter__(self) -> Context:
         if self.closed:

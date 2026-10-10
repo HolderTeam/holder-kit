@@ -1,4 +1,4 @@
-"""Live collection facades which produce detached Holder models and records."""
+"""Live collection facades and detached record exports."""
 
 from __future__ import annotations
 
@@ -220,7 +220,7 @@ class ProjectCollection:
 
 
 class CardCollection:
-    """Read live cards from a context and return detached snapshots."""
+    """Read live Card handles from a context or export detached records."""
 
     __slots__ = ("_context",)
 
@@ -254,10 +254,12 @@ class CardCollection:
         return records
 
     def list(self, project_id: str | None = None) -> builtins.list[Card]:
-        return [
-            Card._from_native(record, record["content"])
-            for record in self._complete_records(project_id)
-        ]
+        cards: builtins.list[Card] = []
+        for current_id in self._project_ids(project_id):
+            project = Project(self._context, current_id)
+            cards.extend(Card._from_native(record, project)
+                         for record in self._context.list_cards(current_id))
+        return cards
 
     @overload
     def to_records(

@@ -3,8 +3,8 @@
 Holder Kit record exports are plain dictionaries with stable field names and
 standard-library types. They own no native resources and remain readable,
 serialisable, and safe to pass elsewhere after their originating `Project` or
-`Context` is closed. `Project` itself is live: use `project.to_record()` to
-capture descriptive values before closing. Its card, connection, tag, milestone,
+`Context` is closed. `Project` and `Card` are live: use `project.to_record()`
+and `card.to_record()` to capture values before closing. Its card, connection, tag, milestone,
 DataFrame and graph exports automatically select that project's data. The
 advanced Context methods also accept explicit project IDs as described below.
 
@@ -81,6 +81,61 @@ an empty substitute body.
 
 All returned dictionaries are detached snapshots: they hold copied Python
 values and remain usable after their originating context closes.
+
+## Live Cards and lifecycle
+
+`project.create_card(...)` and `project.cards.list()` return live Card handles.
+Their `card.project` is the exact Project instance used to obtain them. Advanced
+`context.create_card()`, `context.update_card()` and `context.cards.list()` also
+return live Cards, with borrowed Project handles on that Context. These borrowed
+handles do not promise identity with Project instances obtained separately.
+Closing a borrowed owner affects its Cards; closing the Context affects all owners.
+
+Card descriptive properties read current Core metadata or authoritative content.
+They are read-only; `card.update(content, title=None)` saves edits and returns a
+live Card. Other edits through the Project or Context become visible on existing
+handles. Bulk analysis should use detached exports or batches rather than repeatedly
+reading properties. Card equality and hashing use context, project and card identity,
+not changing metadata. There is no identity cache or automatic reopening.
+
+`card.to_record()` retains its default complete-body shape. Pass
+`include_content=False` for metadata-only values, including cards in Trash.
+Each export copies current values; separate metadata and content reads are not
+an atomic snapshot. Previously exported values remain unchanged and usable after
+close. This changes the earlier Card snapshot model: code needing retained values
+must export a record before closing instead of keeping a Card.
+
+| Card operation | Equivalent Project operation | Result |
+| --- | --- | --- |
+| `card.delete()` or `card.trash()` | `project.delete(card)` or `project.trash(card)` | None; move to Trash |
+| `card.delete(hard=True)` or `card.purge()` | `project.delete(card, hard=True)` or `project.purge(card)` | None; permanently remove |
+| `card.restore()` | `project.restore(card)` | A live Card owned by the same Project |
+
+`hard` is keyword-only and must be bool. Project operations accept only Cards,
+verify their context and project ownership, and resolve their exact current ID.
+Prefixes and titles cannot redirect a stale handle to a different card. Core
+checks lifecycle state: repeated trash, restore of a live card and purge of a
+live card raise `HolderError`. Permanent removal requires the card to already
+be in Trash. Core owns durable files, hierarchy updates, indexes and Git commits;
+Python does not implement those rules again.
+
+Trashing a parent promotes its immediate live children into its former sibling
+position, preserving order and descendants. Already-trashed children remain in
+Trash. Restoring restores only that card, using a reachable ancestor or roots
+when its saved parent is unavailable; promoted children stay put.
+
+`project.cards.trashed()` returns this project's Trash as live Card handles,
+without reading bodies. It also works after reopening, so restoration does not
+require retaining an earlier Python object. Ordinary lists, batches and project
+exports still select live cards. Trash metadata remains readable, but the current
+Core SDK does not support body reads in Trash: `card.content` and a complete
+`card.to_record()` raise `ValueError` until restore. Metadata-only export remains
+available. Core's `rel_path` metadata is not a promise of the current Trash file path.
+
+After permanent removal, descriptive reads and further operations through any
+old handle raise `KeyError`. After the owning Project closes, reads and edits
+raise `RuntimeError`. Stable `card_id`, `project_id` and `card.project` remain
+available in both cases; repr, equality and hashing do not read saved state.
 
 ## Card batches
 
@@ -262,8 +317,8 @@ from the card. These `IntEnum` members mirror core statuses; successful changes
 have numeric value zero, so compare named members rather than testing truthiness.
 Malformed tags raise `ValueError`; non-string arguments raise `TypeError`.
 Core owns tag grammar, extraction, durable edits and reindexing. No bulk/atomic
-mutation contract is implied, and previously detached card models/tables do not
-refresh automatically after a mutation.
+mutation contract is implied, and exported records/tables do not
+refresh automatically after a mutation. Live Card properties read the changes.
 
 Core's editable-list read currently substitutes an empty body if a card file
 is missing. The flag can therefore be false in that situation despite an indexed
@@ -335,8 +390,8 @@ IDs owned by another card are no-ops, but an unknown card raises `HolderError`.
   also raises `HolderError` through the current C ABI exception translation.
 
 Core owns durable front-matter editing, index updates and Git commits; Python
-does not parse or rewrite Markdown. Existing detached objects/records do not
-refresh automatically. Valid calls on a closed context raise `RuntimeError`.
+does not parse or rewrite Markdown. Exported records do not
+refresh automatically. Live Card properties read current state. Valid calls on a closed context raise `RuntimeError`.
 Failed reads abort exports without a partial result; no export-wide snapshot,
 transaction, revision check or bulk mutation guarantee is implied.
 

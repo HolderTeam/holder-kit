@@ -145,6 +145,37 @@ connection kinds identify edges, allowing multiple kinds between the same
 two cards. For this example, the graph has two cards and one connection.
 Editing the graph does not modify Holder.
 
+## Edit, trash and restore a card
+
+Cards belong to their Project and read current state:
+
+```python
+assert evidence.project is project
+saved = evidence.to_record()
+evidence.update("New evidence for the report.")
+print(evidence.content)
+```
+
+`saved` remains a detached copy of the earlier values. Live Cards need an open
+Project; export records before closing if you want to retain their values.
+
+```python
+evidence.trash()  # evidence.delete() does the same
+print([card.title for card in project.cards.trashed()])
+evidence = evidence.restore()
+```
+
+Trashing a parent keeps its children live and promotes them into its place.
+Restoring brings back that card alone. After reopening a project, find cards in
+`project.cards.trashed()` and call `restore()` on the one you want. While a card
+is in Trash, read metadata with `card.to_record(include_content=False)`; restore
+it before reading its body.
+
+For permanent removal, first trash the card, then use `card.purge()` or
+`card.delete(hard=True)`. Both require the card to already be in Trash. The same
+operations are available as `project.trash(card)`, `project.restore(card)` and
+`project.purge(card)`.
+
 To publish your experiment, push it to a new branch in a repository you can write
 to: `project.push(remote_url=remote_url, branch="experiments/results")`.
 You can continue editing and push to that branch again. See

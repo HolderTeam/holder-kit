@@ -134,7 +134,9 @@ Projects returned by `Context.create_project()` and `Context.projects.list()`
 are also live and select their own cards and exports. They borrow the context:
 closing such a Project closes that handle only, while closing the Context makes
 all its project handles unusable. Managed Projects own their context and release
-it on close. Card objects and exported records/tables/graphs remain detached.
+it on close. Each Card holds its owning Project through `card.project`; closing
+that owner also makes the Card's reads and edits unavailable. Card identities and
+`card.project` remain accessible. Exported records/tables/graphs remain detached.
 
 For a runnable example with an explicit temporary directory and reopening, see
 [`reopen_project.py`](../examples/reopen_project.py).

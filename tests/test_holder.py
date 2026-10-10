@@ -3,7 +3,6 @@ from __future__ import annotations
 import gc
 import json
 import sys
-from dataclasses import FrozenInstanceError
 from datetime import timezone
 from pathlib import Path
 
@@ -122,7 +121,7 @@ def test_type_validation(tmp_path: Path) -> None:
     context.close()
 
 
-def test_typed_collections_and_records_are_detached(tmp_path: Path) -> None:
+def test_typed_collections_are_live_and_records_are_detached(tmp_path: Path) -> None:
     context = holderkit.Context(tmp_path / "holder-data")
     first_project = context.create_project("First")
     second_project = context.create_project("Second")
@@ -133,7 +132,7 @@ def test_typed_collections_and_records_are_detached(tmp_path: Path) -> None:
     context.create_card(second_project.project_id, "Other", "other body")
 
     projects = [project.to_record() for project in context.projects.list()]
-    cards = context.cards.list()
+    cards = [card.to_record() for card in context.cards.list()]
     project_records = context.projects.to_records()
     metadata_records: list[holderkit.CardMetadataRecord] = context.cards.to_records(
         first_project.project_id
@@ -144,7 +143,7 @@ def test_typed_collections_and_records_are_detached(tmp_path: Path) -> None:
     context.close()
 
     assert {project["name"] for project in projects} == {"First", "Second"}
-    assert {card.content for card in cards} == {
+    assert {card["content"] for card in cards} == {
         "parent body",
         "child body",
         "other body",
@@ -182,7 +181,7 @@ def test_record_contracts_have_stable_fields_and_empty_results(tmp_path: Path) -
         assert card.updated_datetime.tzinfo is timezone.utc
         assert card.deleted_datetime is None
 
-        with pytest.raises(FrozenInstanceError):
+        with pytest.raises(AttributeError):
             card.title = "mutation"  # type: ignore[misc]
 
 
