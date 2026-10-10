@@ -9,6 +9,10 @@
 #define HOLDER_HAS_PROJECT_IMPORT 0
 #endif
 
+#ifndef HOLDER_HAS_CARD_COLLECTION_PAGE
+#define HOLDER_HAS_CARD_COLLECTION_PAGE 0
+#endif
+
 #ifndef PyCFunction_CAST
 #define PyCFunction_CAST(function) ((PyCFunction)(void (*)(void))(function))
 #endif
@@ -649,6 +653,39 @@ Context_query_cards(ContextObject *self, PyObject *args, PyObject *kwargs)
 }
 
 static PyObject *
+Context_collection_cards_page(ContextObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *project_id = NULL;
+    const char *request_json = NULL;
+    static char *keywords[] = {"project_id", "request_json", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss:collection_cards_page", keywords,
+                                    &project_id, &request_json)) {
+        return NULL;
+    }
+    if (!ensure_context_open(self)) {
+        return NULL;
+    }
+#if HOLDER_HAS_CARD_COLLECTION_PAGE
+    char *output = NULL;
+    holder_error *error = NULL;
+    const int result = holder_card_collection_page_json(
+        self->context, project_id, request_json, &output, &error
+    );
+    if (result != HOLDER_OK) {
+        holder_string_free(output);
+        raise_holder_error(self, result, error);
+        return NULL;
+    }
+    holder_error_destroy(error);
+    return json_from_native_string(output);
+#else
+    PyErr_SetString(PyExc_NotImplementedError,
+                    "Filtered card batches require a Core SDK with collection pagination support");
+    return NULL;
+#endif
+}
+
+static PyObject *
 Context_list_complete_cards_page(ContextObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *project_id = NULL;
@@ -817,6 +854,8 @@ static PyMethodDef Context_methods[] = {
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("List live cards in a project.")},
     {"query_cards", PyCFunction_CAST(Context_query_cards),
      METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Query a card metadata view through Core.")},
+    {"collection_cards_page", PyCFunction_CAST(Context_collection_cards_page),
+     METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Read a filtered card collection page through Core.")},
     {"list_complete_cards_page", PyCFunction_CAST(Context_list_complete_cards_page),
      METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("List one opaque-cursor page of live cards with authoritative bodies.")},
@@ -871,6 +910,9 @@ static int
 holder_module_exec(PyObject *module)
 {
     if (PyModule_AddIntConstant(module, "PROJECT_IMPORT_SUPPORTED", HOLDER_HAS_PROJECT_IMPORT) < 0) {
+        return -1;
+    }
+    if (PyModule_AddIntConstant(module, "CARD_COLLECTION_SUPPORTED", HOLDER_HAS_CARD_COLLECTION_PAGE) < 0) {
         return -1;
     }
     if (PyModule_AddIntConstant(module, "CARD_PAGE_MAX_LIMIT", HOLDER_CARD_LIST_COMPLETE_MAX_LIMIT) < 0) {

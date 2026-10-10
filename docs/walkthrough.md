@@ -83,6 +83,26 @@ Calling `project.cards(...)` returns a lazy iterator of record lists. The final
 batch may be smaller. Keep the project open while iterating; each batch contains
 ordinary Python records. Omit `include_content` for metadata-only records.
 
+Select a useful subset with a tag, root cards, or the immediate children of a card:
+
+```python
+for batch in project.cards(tag="todo", include_content=True):
+    for card in batch:
+        print(card["title"], card["content"])
+
+for batch in project.cards(roots=True):
+    print([card["title"] for card in batch])
+
+for batch in project.cards(parent_card_id=report.card_id, tag="todo"):
+    print([card["title"] for card in batch])
+```
+
+Tags match without regard to case; pass the name without `#`. Tag and hierarchy
+filters can be combined. `roots=True` and `parent_card_id` are alternatives.
+Use `order="card_id"` for ascending card IDs or `order="updated"` for the most
+recently updated first. Filtered batches require a Core SDK with collection
+pagination support; older SDKs raise `NotImplementedError`.
+
 ## Analyse the project with pandas
 
 ```python

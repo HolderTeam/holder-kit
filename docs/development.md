@@ -96,11 +96,11 @@ dependencies, ownership checks and failure behavior where relevant.
 ## Clone build requirements
 
 Clone uses Core's `holder_project_import` API. The release SDK and development
-source pins select `bd88c6d008a6d3cb5b427252aa010e96834bb058`, which provides it.
+source pins select `6939896f7aa56a8e8542a65f0dc4d75fa506e817`, which provides it.
 To select and build that published SDK:
 
 ```sh
-./make.sh sdk bd88c6d008a6d3cb5b427252aa010e96834bb058
+./make.sh sdk 6939896f7aa56a8e8542a65f0dc4d75fa506e817
 ./make.sh --sdk setup
 ```
 
@@ -156,3 +156,13 @@ is `HolderTeam/holder-kit`. When updating an older environment, uninstall the
 former `holder` distribution and replace `import holder` with `import holderkit`.
 Dependency declarations use `holder-kit`, `holder-kit[pandas]` or
 `holder-kit[graph]`. There is no compatibility import shim.
+
+## Filtered card batch build requirements
+
+Filtered `project.cards(...)` batches use Core's `holder_card_collection_page_json`
+API, advertised by `HOLDER_HAS_CARD_COLLECTION_PAGE`. The release SDK and source
+pins select `6939896f7aa56a8e8542a65f0dc4d75fa506e817`, which provides it. Use the
+SDK selection command above to test against that published revision. For changes
+to Core, use an explicit source override and test the standalone Core repository
+first. Existing unfiltered batches work with older SDKs; requesting filters or
+explicit ordering without this API raises `NotImplementedError`.
